@@ -1,0 +1,14 @@
+{
+  "name": "hya-tech-employee-management-system",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Root launcher for HYA Tech HRMS client and server",
+  "scripts": {
+    "dev": "node scripts/start-dev.js",
+    "dev:server": "npm --prefix server run dev",
+    "dev:client": "npm --prefix client run dev",
+    "build": "npm --prefix client run build",
+    "seed": "npm --prefix server run seed",
+    "install:all": "npm --prefix server install && npm --prefix client install"
+  }
+}
