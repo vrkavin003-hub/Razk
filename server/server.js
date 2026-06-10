@@ -1,9 +1,14 @@
 const cors = require("cors");
 const dotenv = require("dotenv");
 const express = require("express");
+const rateLimit = require("express-rate-limit");
+const helmet = require("helmet");
 const morgan = require("morgan");
 const connectDB = require("./config/db");
 const { errorHandler, notFound } = require("./middleware/errorMiddleware");
+const { connectSql } = require("./sql/db");
+const sqlErrorHandler = require("./sql/middleware/error");
+const mountSqlApi = require("./sql/mountSqlApi");
 const mountLocalDevApi = require("./utils/localDevApi");
 
 dotenv.config();
@@ -15,6 +20,19 @@ const allowedClientOrigins = (process.env.CLIENT_URL || "http://localhost:5174")
   .map((origin) => origin.trim())
   .filter(Boolean);
 
+app.use(
+  helmet({
+    crossOriginResourcePolicy: { policy: "cross-origin" }
+  })
+);
+app.use(
+  rateLimit({
+    windowMs: Number(process.env.RATE_LIMIT_WINDOW_MS || 15 * 60 * 1000),
+    max: Number(process.env.RATE_LIMIT_MAX || 300),
+    standardHeaders: true,
+    legacyHeaders: false
+  })
+);
 app.use(
   cors({
     origin(origin, callback) {
@@ -55,6 +73,7 @@ const mountMongoApi = () => {
   app.use("/api/attendance", require("./routes/attendanceRoutes"));
   app.use("/api/leave", require("./routes/leaveRoutes"));
   app.use("/api/permission", require("./routes/permissionRoutes"));
+  app.use("/api/office-location", require("./routes/officeLocationRoutes"));
   app.use("/api/announcements", require("./routes/announcementRoutes"));
   app.use("/api/notifications", require("./routes/notificationRoutes"));
   app.use("/api/reports", require("./routes/reportRoutes"));
@@ -62,21 +81,28 @@ const mountMongoApi = () => {
 };
 
 const startServer = async () => {
-  try {
-    await connectDB();
-    mountMongoApi();
-  } catch (error) {
-    if (process.env.ALLOW_LOCAL_STORE === "false") {
-      throw error;
-    }
+  const useSql = process.env.DB_CLIENT === "mysql" || process.env.USE_SQL === "true";
 
-    console.warn("MongoDB is not available. Starting with local development data store.");
-    console.warn(error.message);
-    mountLocalDevApi(app);
+  if (useSql) {
+    await connectSql();
+    mountSqlApi(app);
+  } else {
+    try {
+      await connectDB();
+      mountMongoApi();
+    } catch (error) {
+      if (process.env.ALLOW_LOCAL_STORE === "false") {
+        throw error;
+      }
+
+      console.warn("MongoDB is not available. Starting with local development data store.");
+      console.warn(error.message);
+      mountLocalDevApi(app);
+    }
   }
 
   app.use(notFound);
-  app.use(errorHandler);
+  app.use(useSql ? sqlErrorHandler : errorHandler);
 
   const port = process.env.PORT || 5000;
   app.listen(port, () => {

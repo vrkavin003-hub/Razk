@@ -24,7 +24,7 @@ import ThemeToggle from "../components/ThemeToggle";
 import TopBarClock from "../components/TopBarClock";
 import { useAuth } from "../context/AuthContext";
 import api from "../services/api";
-import { initials } from "../utils/formatters";
+import { initials, roleMatches } from "../utils/formatters";
 
 const navItems = [
   { label: "Dashboard", path: "/admin", icon: LayoutDashboard, roles: ["admin"], section: "Overview" },
@@ -64,7 +64,7 @@ export default function AppLayout() {
     permissionUpdateCount: 0
   });
 
-  const items = navItems.filter((item) => item.roles.includes(user?.role));
+  const items = navItems.filter((item) => roleMatches(user?.role, item.roles));
   const activeItem = [...items]
     .sort((a, b) => b.path.length - a.path.length)
     .find((item) => location.pathname === item.path || location.pathname.startsWith(`${item.path}/`));
@@ -117,10 +117,10 @@ export default function AppLayout() {
 
   const menuBadge = (path) => {
     if (path === "/leave") {
-      return ["admin", "hr"].includes(user?.role) ? counts.pendingLeaveCount : counts.leaveUpdateCount;
+      return roleMatches(user?.role, ["admin", "hr"]) ? counts.pendingLeaveCount : counts.leaveUpdateCount;
     }
     if (path === "/permission") {
-      return ["admin", "hr"].includes(user?.role)
+      return roleMatches(user?.role, ["admin", "hr"])
         ? counts.pendingPermissionCount
         : counts.permissionUpdateCount;
     }
@@ -128,9 +128,9 @@ export default function AppLayout() {
   };
 
   const menuLabel = (item) => {
-    if (item.path === "/leave") return ["admin", "hr"].includes(user?.role) ? "Leave Requests" : "My Leave";
+    if (item.path === "/leave") return roleMatches(user?.role, ["admin", "hr"]) ? "Leave Requests" : "My Leave";
     if (item.path === "/permission") {
-      return ["admin", "hr"].includes(user?.role) ? "Permission Requests" : "My Permission";
+      return roleMatches(user?.role, ["admin", "hr"]) ? "Permission Requests" : "My Permission";
     }
     return item.label;
   };

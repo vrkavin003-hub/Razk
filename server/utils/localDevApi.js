@@ -5,6 +5,7 @@ const jwt = require("jsonwebtoken");
 const path = require("path");
 const toCsv = require("./csv");
 const { daysBetweenInclusive, getWorkingHours, isLateCheckIn, toDateKey } = require("./dates");
+const { buildLocationDecision, validateCoordinates } = require("./geo");
 const {
   buildDepartmentReport,
   buildEmployeeReport,
@@ -77,6 +78,18 @@ const createInitialData = () => ({
       updatedAt: new Date().toISOString()
     }
   ],
+  officeLocations: [
+    {
+      _id: newId(),
+      officeName: "HYA Tech",
+      latitude: 12.740912,
+      longitude: 77.825292,
+      radiusMeters: 100,
+      status: "active",
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString()
+    }
+  ],
   attendance: [],
   leaves: [],
   permissions: [],
@@ -109,6 +122,18 @@ let db = loadDb();
 db.notifications = db.notifications || [];
 db.announcements = db.announcements || [];
 db.attendance = db.attendance || [];
+db.officeLocations = db.officeLocations || [
+  {
+    _id: newId(),
+    officeName: "HYA Tech",
+    latitude: 12.740912,
+    longitude: 77.825292,
+    radiusMeters: 100,
+    status: "active",
+    createdAt: new Date().toISOString(),
+    updatedAt: new Date().toISOString()
+  }
+];
 db.leaves = db.leaves || [];
 db.permissions = db.permissions || [];
 db.users = db.users || [];
@@ -133,6 +158,7 @@ const generateToken = (id) =>
   });
 
 const matchUser = (id) => db.users.find((user) => user._id === id && user.isActive);
+const outsideLocationMessage = "You are outside the allowed company location. Attendance cannot be marked.";
 
 const protect = (req, res, next) => {
   const authHeader = req.headers.authorization || "";
@@ -289,6 +315,36 @@ const filteredAttendance = (query) => {
     records = records.filter((record) => employees.includes(record.employee));
   }
   return records.sort((a, b) => String(b.date).localeCompare(String(a.date)));
+};
+
+const activeOfficeLocation = () =>
+  [...db.officeLocations].filter((office) => office.status === "active").sort((a, b) => String(b.updatedAt).localeCompare(String(a.updatedAt)))[0];
+
+const validateLocalAttendanceLocation = (body) => {
+  let coordinates;
+  try {
+    coordinates = validateCoordinates(body);
+  } catch (error) {
+    error.statusCode = 400;
+    throw error;
+  }
+
+  const office = activeOfficeLocation();
+  if (!office) {
+    const error = new Error("No active office location is configured. Please contact admin.");
+    error.statusCode = 400;
+    throw error;
+  }
+
+  const decision = buildLocationDecision({ ...coordinates, office });
+  if (!decision.inside) {
+    const error = new Error(outsideLocationMessage);
+    error.statusCode = 403;
+    error.details = decision;
+    throw error;
+  }
+
+  return { ...coordinates, decision };
 };
 
 const orgDashboard = () => {
@@ -534,10 +590,99 @@ const mountLocalDevApi = (app) => {
     return json(res, { message: "Employee deactivated" });
   });
 
+  app.get("/api/office-location", protect, (req, res) => {
+    const activeOffice = activeOfficeLocation() || null;
+    if (["admin", "hr"].includes(req.user.role)) {
+      return json(res, { activeOffice, locations: [...db.officeLocations].sort((a, b) => String(b.updatedAt).localeCompare(String(a.updatedAt))) });
+    }
+    return json(res, { activeOffice });
+  });
+
+  app.get("/api/office-location/distance", protect, (req, res) => {
+    try {
+      const coordinates = validateCoordinates(req.query);
+      const activeOffice = activeOfficeLocation();
+      if (!activeOffice) return json(res, { message: "No active office location is configured" }, 400);
+      return json(res, {
+        activeOffice,
+        decision: buildLocationDecision({ ...coordinates, office: activeOffice })
+      });
+    } catch (error) {
+      return json(res, { message: error.message }, error.statusCode || 400);
+    }
+  });
+
+  app.post("/api/office-location", protect, authorize("admin"), (req, res) => {
+    try {
+      const coordinates = validateCoordinates(req.body);
+      const radiusMeters = Number(req.body.radiusMeters ?? req.body.radius_meters);
+      const officeName = String(req.body.officeName || req.body.office_name || "").trim();
+      if (!officeName) return json(res, { message: "Office name is required" }, 400);
+      if (!Number.isFinite(radiusMeters) || radiusMeters <= 0) {
+        return json(res, { message: "Allowed radius must be a positive number" }, 400);
+      }
+      if (req.body.status !== "inactive") {
+        db.officeLocations.forEach((office) => {
+          if (office.status === "active") office.status = "inactive";
+        });
+      }
+      const officeLocation = {
+        _id: newId(),
+        officeName,
+        ...coordinates,
+        radiusMeters,
+        status: req.body.status === "inactive" ? "inactive" : "active",
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString()
+      };
+      db.officeLocations.push(officeLocation);
+      saveDb();
+      return json(res, { officeLocation }, 201);
+    } catch (error) {
+      return json(res, { message: error.message }, error.statusCode || 400);
+    }
+  });
+
+  app.put("/api/office-location/:id", protect, authorize("admin"), (req, res) => {
+    try {
+      const officeLocation = db.officeLocations.find((office) => office._id === req.params.id);
+      if (!officeLocation) return json(res, { message: "Office location not found" }, 404);
+      const coordinates = validateCoordinates(req.body);
+      const radiusMeters = Number(req.body.radiusMeters ?? req.body.radius_meters);
+      const officeName = String(req.body.officeName || req.body.office_name || "").trim();
+      if (!officeName) return json(res, { message: "Office name is required" }, 400);
+      if (!Number.isFinite(radiusMeters) || radiusMeters <= 0) {
+        return json(res, { message: "Allowed radius must be a positive number" }, 400);
+      }
+      if (req.body.status !== "inactive") {
+        db.officeLocations.forEach((office) => {
+          if (office._id !== req.params.id && office.status === "active") office.status = "inactive";
+        });
+      }
+      Object.assign(officeLocation, {
+        officeName,
+        ...coordinates,
+        radiusMeters,
+        status: req.body.status === "inactive" ? "inactive" : "active",
+        updatedAt: new Date().toISOString()
+      });
+      saveDb();
+      return json(res, { officeLocation });
+    } catch (error) {
+      return json(res, { message: error.message }, error.statusCode || 400);
+    }
+  });
+
   app.post("/api/attendance/check-in", protect, (req, res) => {
     const date = toDateKey();
     if (db.attendance.some((record) => record.employee === req.user._id && record.date === date)) {
       return json(res, { message: "You have already checked in today" }, 409);
+    }
+    let location;
+    try {
+      location = validateLocalAttendanceLocation(req.body);
+    } catch (error) {
+      return json(res, { message: error.message, location: error.details }, error.statusCode || 400);
     }
     const now = new Date();
     const attendance = {
@@ -546,7 +691,15 @@ const mountLocalDevApi = (app) => {
       employeeId: req.user.employeeId || req.user._id,
       date,
       checkIn: now.toISOString(),
+      checkInLatitude: location.latitude,
+      checkInLongitude: location.longitude,
+      checkInLocationStatus: location.decision.status,
+      checkInDistanceMeters: location.decision.distanceMeters,
       checkOut: null,
+      checkOutLatitude: null,
+      checkOutLongitude: null,
+      checkOutLocationStatus: "Unknown",
+      checkOutDistanceMeters: null,
       workingHours: 0,
       status: isLateCheckIn(now) ? "Late" : "Present",
       locationNote: req.body.locationNote || "",
@@ -556,7 +709,7 @@ const mountLocalDevApi = (app) => {
     };
     db.attendance.push(attendance);
     saveDb();
-    return json(res, { attendance }, 201);
+    return json(res, { attendance, location: location.decision }, 201);
   });
 
   app.post("/api/attendance/check-out", protect, (req, res) => {
@@ -564,13 +717,23 @@ const mountLocalDevApi = (app) => {
     const attendance = db.attendance.find((record) => record.employee === req.user._id && record.date === date);
     if (!attendance?.checkIn) return json(res, { message: "You must check in before checking out" }, 400);
     if (attendance.checkOut) return json(res, { message: "You have already checked out today" }, 409);
+    let location;
+    try {
+      location = validateLocalAttendanceLocation(req.body);
+    } catch (error) {
+      return json(res, { message: error.message, location: error.details }, error.statusCode || 400);
+    }
     const now = new Date();
     attendance.checkOut = now.toISOString();
+    attendance.checkOutLatitude = location.latitude;
+    attendance.checkOutLongitude = location.longitude;
+    attendance.checkOutLocationStatus = location.decision.status;
+    attendance.checkOutDistanceMeters = location.decision.distanceMeters;
     attendance.workingHours = getWorkingHours(attendance.checkIn, now);
     attendance.status = attendance.workingHours < 4 ? "Half Day" : attendance.status;
     attendance.updatedAt = now.toISOString();
     saveDb();
-    return json(res, { attendance });
+    return json(res, { attendance, location: location.decision });
   });
 
   app.get("/api/attendance/today", protect, (req, res) => {
@@ -605,7 +768,21 @@ const mountLocalDevApi = (app) => {
   app.get("/api/attendance/export-csv", protect, authorize("admin", "hr"), (req, res) => {
     const attendance = filteredAttendance(req.query).map(populateAttendance);
     const rows = [
-      ["Date", "Employee ID", "Name", "Department", "Designation", "Check In", "Check Out", "Working Hours", "Status"],
+      [
+        "Date",
+        "Employee ID",
+        "Name",
+        "Department",
+        "Designation",
+        "Check In",
+        "Check Out",
+        "Working Hours",
+        "Status",
+        "Check In Location",
+        "Check In Distance (m)",
+        "Check Out Location",
+        "Check Out Distance (m)"
+      ],
       ...attendance.map((record) => [
         record.date,
         record.employeeId,
@@ -615,7 +792,11 @@ const mountLocalDevApi = (app) => {
         record.checkIn || "",
         record.checkOut || "",
         record.workingHours,
-        record.status
+        record.status,
+        record.checkInLocationStatus || "",
+        record.checkInDistanceMeters ?? "",
+        record.checkOutLocationStatus || "",
+        record.checkOutDistanceMeters ?? ""
       ])
     ];
     res.header("Content-Type", "text/csv");

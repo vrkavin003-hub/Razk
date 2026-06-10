@@ -8,6 +8,11 @@ client/.env
 *.log
 *.err
 server/data/
+server/uploads/*
+!server/uploads/.gitkeep
+!server/uploads/resumes/
+server/uploads/resumes/*
+!server/uploads/resumes/.gitkeep
 npm-debug.log*
 .DS_Store
 .chrome-hya/

@@ -16,7 +16,23 @@ const attendanceSchema = new mongoose.Schema(
       required: true
     },
     checkIn: Date,
+    checkInLatitude: Number,
+    checkInLongitude: Number,
+    checkInLocationStatus: {
+      type: String,
+      enum: ["Inside", "Outside", "Unknown"],
+      default: "Unknown"
+    },
+    checkInDistanceMeters: Number,
     checkOut: Date,
+    checkOutLatitude: Number,
+    checkOutLongitude: Number,
+    checkOutLocationStatus: {
+      type: String,
+      enum: ["Inside", "Outside", "Unknown"],
+      default: "Unknown"
+    },
+    checkOutDistanceMeters: Number,
     workingHours: {
       type: Number,
       default: 0

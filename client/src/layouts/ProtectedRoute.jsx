@@ -1,6 +1,6 @@
 import { Navigate, Outlet, useLocation } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
-import { dashboardPathForRole } from "../utils/formatters";
+import { dashboardPathForRole, roleMatches } from "../utils/formatters";
 
 export default function ProtectedRoute({ roles }) {
   const { isAuthenticated, user } = useAuth();
@@ -10,7 +10,7 @@ export default function ProtectedRoute({ roles }) {
     return <Navigate to="/login" replace state={{ from: location }} />;
   }
 
-  if (roles?.length && !roles.includes(user?.role)) {
+  if (roles?.length && !roleMatches(user?.role, roles)) {
     return <Navigate to={dashboardPathForRole(user?.role)} replace />;
   }
 

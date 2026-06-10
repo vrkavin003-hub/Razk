@@ -78,7 +78,52 @@ server/
   utils/
 ```
 
+## SQL Production Backend
+
+This app now supports a production SQL backend using MySQL 8. Enable it with:
+
+```env
+DB_CLIENT=mysql
+```
+
+SQL deliverables:
+
+- Complete schema: `server/database/schema.sql`
+- Schema diagram: `docs/sql-database-schema.md`
+- API reference: `docs/sql-api-reference.md`
+- Setup and deployment: `docs/sql-setup-and-deployment.md`
+- Migration plan: `docs/sql-migration-plan.md`
+- Location attendance guide: `docs/location-attendance.md`
+
+Create the SQL database:
+
+```bash
+mysql -u root -p < server/database/schema.sql
+```
+
+Seed the first SQL admin:
+
+```bash
+npm --prefix server run seed:sql
+```
+
+Use these production server variables:
+
+```env
+DB_CLIENT=mysql
+MYSQL_HOST=127.0.0.1
+MYSQL_PORT=3306
+MYSQL_USER=hyatech_user
+MYSQL_PASSWORD=replace-with-strong-password
+MYSQL_DATABASE=hyatech_db
+JWT_SECRET=replace-with-a-long-random-secret
+CLIENT_URL=https://your-frontend-domain.com
+ALLOW_LOCAL_STORE=false
+```
+
 ## MongoDB Setup
+
+MongoDB remains available for the original HRMS development workflow. For production SQL deployment, use the SQL setup above.
 
 Use a local MongoDB instance or MongoDB Atlas.
 

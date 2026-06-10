@@ -103,6 +103,10 @@ const buildDailyRecords = ({ employee, attendance, leaves, from, to }) =>
       checkIn: attendanceRecord?.checkIn || attendanceRecord?.checkInTime || null,
       checkOut: attendanceRecord?.checkOut || attendanceRecord?.checkOutTime || null,
       workingHours: Number(attendanceRecord?.workingHours || 0),
+      checkInLocationStatus: attendanceRecord?.checkInLocationStatus || "Unknown",
+      checkInDistanceMeters: attendanceRecord?.checkInDistanceMeters ?? "",
+      checkOutLocationStatus: attendanceRecord?.checkOutLocationStatus || "Unknown",
+      checkOutDistanceMeters: attendanceRecord?.checkOutDistanceMeters ?? "",
       status,
       statusCode: statusCode(status),
       remarks
@@ -407,18 +411,22 @@ const renderEmployeePdf = (doc, report) => {
     doc,
     [
       { key: "date", label: "Date", width: 68 },
-      { key: "day", label: "Day", width: 42 },
-      { key: "checkInText", label: "Check-in", width: 68 },
-      { key: "checkOutText", label: "Check-out", width: 68 },
-      { key: "workingHours", label: "Hours", width: 48 },
-      { key: "status", label: "Status", width: 70 },
-      { key: "remarks", label: "Remarks", width: 136 }
+      { key: "day", label: "Day", width: 34 },
+      { key: "checkInText", label: "Check-in", width: 58 },
+      { key: "checkOutText", label: "Check-out", width: 58 },
+      { key: "workingHours", label: "Hrs", width: 34 },
+      { key: "status", label: "Status", width: 54 },
+      { key: "checkInGps", label: "In GPS", width: 58 },
+      { key: "checkOutGps", label: "Out GPS", width: 58 },
+      { key: "remarks", label: "Remarks", width: 78 }
     ],
     report.records.map((record) => ({
       ...record,
       date: formatDate(record.date),
       checkInText: formatTime(record.checkIn),
-      checkOutText: formatTime(record.checkOut)
+      checkOutText: formatTime(record.checkOut),
+      checkInGps: record.checkInDistanceMeters !== "" ? `${record.checkInLocationStatus} ${record.checkInDistanceMeters}m` : "-",
+      checkOutGps: record.checkOutDistanceMeters !== "" ? `${record.checkOutLocationStatus} ${record.checkOutDistanceMeters}m` : "-"
     })),
     y
   );

@@ -1,7 +1,13 @@
 export const dashboardPathForRole = (role) => {
-  if (role === "admin") return "/admin";
+  if (role === "admin" || role === "super_admin") return "/admin";
   if (role === "hr") return "/hr";
   return "/employee";
+};
+
+export const roleMatches = (role, allowedRoles = []) => {
+  if (!allowedRoles.length) return true;
+  if (role === "super_admin" && allowedRoles.includes("admin")) return true;
+  return allowedRoles.includes(role);
 };
 
 export const formatDate = (value) => {
