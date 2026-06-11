@@ -13,7 +13,7 @@ mysql -u root -p < server/database/schema.sql
 ```env
 DB_CLIENT=mysql
 PORT=5000
-CLIENT_URL=http://localhost:5174
+CLIENT_ORIGIN=http://localhost:5174
 JWT_SECRET=replace-with-a-long-random-secret
 JWT_EXPIRES_IN=15m
 REFRESH_TOKEN_DAYS=30
@@ -62,7 +62,7 @@ Backend environment:
 ```env
 NODE_ENV=production
 DB_CLIENT=mysql
-CLIENT_URL=https://your-frontend-domain.com
+CLIENT_ORIGIN=https://your-frontend-domain.com
 JWT_SECRET=long-random-production-secret
 MYSQL_HOST=your-mysql-host
 MYSQL_PORT=3306
@@ -104,7 +104,7 @@ client/dist
 - Use a 32+ character `JWT_SECRET`.
 - Use MySQL users with least privilege.
 - Keep `ALLOW_LOCAL_STORE=false` in production.
-- Restrict `CLIENT_URL` to the real frontend domain.
+- Restrict `CLIENT_ORIGIN` to the real frontend domain.
 - Terminate HTTPS at the host/load balancer.
 - Back up MySQL daily.
 - Store uploads in object storage when using multiple backend instances.

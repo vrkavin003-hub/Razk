@@ -86,6 +86,7 @@ const updateEmployee = asyncHandler(async (req, res) => {
       "employeeId",
       "department",
       "designation",
+      "assignedShift",
       "phone",
       "joiningDate",
       "address",

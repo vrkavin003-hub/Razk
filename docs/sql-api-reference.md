@@ -78,8 +78,8 @@ Payload:
 
 | Method | Endpoint | Access | Purpose |
 | --- | --- | --- | --- |
-| POST | `/attendance/check-in` | Authenticated employee/user | Location-validated check-in |
-| POST | `/attendance/check-out` | Authenticated employee/user | Location-validated check-out |
+| POST | `/attendance/check-in` | Authenticated employee/user | Check-in with optional location capture |
+| POST | `/attendance/check-out` | Authenticated employee/user | Check-out with optional location capture |
 | GET | `/attendance/my-attendance` | Authenticated | Own attendance history |
 | GET | `/attendance/my-history` | Authenticated | Compatibility alias for own history |
 | GET | `/attendance/all` | Admin/HR/Manager | All attendance records |
@@ -95,11 +95,13 @@ Check-in/check-out payload:
 }
 ```
 
-Backend validates location with the Haversine formula and rejects outside attempts:
+Location is stored when provided. If permission is denied or coordinates are unavailable, attendance is still marked with a location status:
 
 ```json
 {
-  "message": "You are outside the allowed company location. Attendance cannot be marked."
+  "locationStatus": "Permission denied",
+  "latitude": null,
+  "longitude": null
 }
 ```
 

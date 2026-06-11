@@ -2,6 +2,15 @@ const jwt = require("jsonwebtoken");
 const asyncHandler = require("../utils/asyncHandler");
 const User = require("../models/User");
 
+const getJwtSecret = () => {
+  if (!process.env.JWT_SECRET) {
+    const error = new Error("JWT_SECRET is missing. Set it in the backend environment before using authentication.");
+    error.statusCode = 500;
+    throw error;
+  }
+  return process.env.JWT_SECRET;
+};
+
 const protect = asyncHandler(async (req, res, next) => {
   const authHeader = req.headers.authorization || "";
   const [scheme, token] = authHeader.split(" ");
@@ -11,8 +20,10 @@ const protect = asyncHandler(async (req, res, next) => {
     throw new Error("Not authorized, token missing");
   }
 
+  const jwtSecret = getJwtSecret();
+
   try {
-    const decoded = jwt.verify(token, process.env.JWT_SECRET);
+    const decoded = jwt.verify(token, jwtSecret);
     const user = await User.findById(decoded.id).select("-password");
 
     if (!user || !user.isActive) {

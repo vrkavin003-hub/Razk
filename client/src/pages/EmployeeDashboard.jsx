@@ -1,4 +1,4 @@
-import { CalendarCheck, Clock3, LogIn, LogOut, Navigation, Send } from "lucide-react";
+import { CalendarCheck, Clock3, ExternalLink, LogIn, LogOut, Navigation, Send } from "lucide-react";
 import { useEffect, useState } from "react";
 import toast from "react-hot-toast";
 import Button from "../components/Button";
@@ -11,9 +11,10 @@ import StatusBadge from "../components/StatusBadge";
 import { useAuth } from "../context/AuthContext";
 import api from "../services/api";
 import { formatDate, formatTime } from "../utils/formatters";
-import { evaluateOfficeLocation, getBrowserLocation } from "../utils/geolocation";
+import { getAttendanceLocationPayload, googleMapsUrl } from "../utils/geolocation";
+import { attendanceShift } from "../utils/shifts";
 
-const outsideLocationMessage = "You are outside the allowed company location. Attendance cannot be marked.";
+const locationUnavailableMessage = "Attendance marked, but location could not be captured.";
 
 const defaultLeave = {
   leaveType: "Casual Leave",
@@ -26,10 +27,9 @@ export default function EmployeeDashboard() {
   const { user } = useAuth();
   const [dashboard, setDashboard] = useState(null);
   const [leaveForm, setLeaveForm] = useState(defaultLeave);
-  const [office, setOffice] = useState(null);
   const [locationState, setLocationState] = useState({
     coordinates: null,
-    decision: null,
+    status: "Not checked",
     error: "",
     loading: false
   });
@@ -42,39 +42,34 @@ export default function EmployeeDashboard() {
 
   useEffect(() => {
     load();
-    api
-      .get("/office-location")
-      .then(({ data }) => setOffice(data.activeOffice))
-      .catch((error) => setLocationState((current) => ({ ...current, error: error.message })));
   }, []);
 
-  const refreshLocation = async () => {
+  const refreshLocation = async (notify = true) => {
     setLocationState((current) => ({ ...current, error: "", loading: true }));
-    try {
-      const activeOffice = office || (await api.get("/office-location")).data.activeOffice;
-      if (!activeOffice) throw new Error("No active office location is configured. Please contact admin.");
-      setOffice(activeOffice);
-      const coordinates = await getBrowserLocation();
-      const decision = evaluateOfficeLocation(coordinates, activeOffice);
-      setLocationState({ coordinates, decision, error: "", loading: false });
-      return { coordinates, decision };
-    } catch (error) {
-      setLocationState((current) => ({ ...current, error: error.message, loading: false }));
-      throw error;
-    }
+    const location = await getAttendanceLocationPayload();
+    const coordinates = location.latitude !== null && location.longitude !== null ? location : null;
+    setLocationState({
+      coordinates,
+      status: location.locationStatus,
+      error: location.locationError,
+      loading: false
+    });
+    if (notify && location.locationStatus === "Captured") toast.success("Location captured successfully.");
+    return location;
   };
 
   const attendanceAction = async (path, successMessage) => {
     setLoadingAction(true);
     try {
-      const { coordinates, decision } = await refreshLocation();
-      if (!decision?.inside) throw new Error(outsideLocationMessage);
+      const location = await refreshLocation(false);
       await api.post(path, {
         employee_id: user?.employeeId,
-        latitude: coordinates.latitude,
-        longitude: coordinates.longitude
+        accuracy: location.accuracy,
+        latitude: location.latitude,
+        locationStatus: location.locationStatus,
+        longitude: location.longitude
       });
-      toast.success(successMessage);
+      toast.success(location.locationStatus === "Captured" ? successMessage : location.locationStatus === "Permission denied" ? "Attendance marked, but location permission was not allowed." : locationUnavailableMessage);
       await load();
     } catch (error) {
       toast.error(error.message);
@@ -115,16 +110,16 @@ export default function EmployeeDashboard() {
             <div>
               <h2 className="text-base font-bold text-slate-950">Today Attendance</h2>
               <p className="mt-1 text-sm text-slate-500">
-                Working hours: {dashboard.workingHoursToday || 0} | Pending requests: {dashboard.pendingRequests || 0}
+                Working hours: {dashboard.workingHoursToday || 0} | Shift: {attendanceShift(dashboard.attendance || {})} | Pending requests: {dashboard.pendingRequests || 0}
               </p>
             </div>
             <StatusBadge status={dashboard.todayStatus} />
           </div>
           <div className="mt-5 flex flex-wrap gap-3">
             <Button
-              disabled={loadingAction || Boolean(dashboard.attendance?.checkIn) || (locationState.decision && !locationState.decision.inside)}
+              disabled={loadingAction || Boolean(dashboard.attendance?.checkIn)}
               icon={LogIn}
-              onClick={() => attendanceAction("/attendance/check-in", "Checked in successfully")}
+              onClick={() => attendanceAction("/attendance/check-in", "Check-in marked successfully.")}
             >
               Check In
             </Button>
@@ -132,52 +127,59 @@ export default function EmployeeDashboard() {
               disabled={
                 loadingAction ||
                 !dashboard.attendance?.checkIn ||
-                Boolean(dashboard.attendance?.checkOut) ||
-                (locationState.decision && !locationState.decision.inside)
+                Boolean(dashboard.attendance?.checkOut)
               }
               icon={LogOut}
-              onClick={() => attendanceAction("/attendance/check-out", "Checked out successfully")}
+              onClick={() => attendanceAction("/attendance/check-out", "Check-out marked successfully.")}
               variant="success"
             >
               Check Out
             </Button>
-            <Button disabled={locationState.loading} icon={Navigation} onClick={refreshLocation} variant="secondary">
+            <Button disabled={locationState.loading} icon={Navigation} onClick={() => refreshLocation()} variant="secondary">
               {locationState.loading ? "Checking GPS..." : "Refresh Location"}
             </Button>
           </div>
           <div className="mt-5 grid gap-3 md:grid-cols-3">
             <div className="surface-muted p-4">
-              <p className="text-xs font-black uppercase text-slate-500">Office</p>
-              <p className="mt-2 text-sm font-bold text-slate-950">{office?.officeName || "Not configured"}</p>
-              <p className="mt-1 text-xs text-slate-500">Radius: {office?.radiusMeters || "-"} meters</p>
+              <p className="text-xs font-black uppercase text-slate-500">Location Status</p>
+              <p className="mt-2 text-sm font-bold text-slate-950">{locationState.status}</p>
+              <p className="mt-1 text-xs text-slate-500">Attendance is allowed from any location.</p>
             </div>
             <div className="surface-muted p-4">
-              <p className="text-xs font-black uppercase text-slate-500">GPS Status</p>
-              <p className={`mt-2 text-sm font-black ${locationState.decision?.inside ? "text-emerald-700" : locationState.decision ? "text-rose-700" : "text-slate-700"}`}>
-                {locationState.decision?.status || "Not checked"}
+              <p className="text-xs font-black uppercase text-slate-500">Coordinates</p>
+              <p className="mt-2 text-sm font-black text-slate-950">
+                {locationState.coordinates ? `${locationState.coordinates.latitude}, ${locationState.coordinates.longitude}` : "-"}
               </p>
               <p className="mt-1 text-xs text-slate-500">Accuracy: {locationState.coordinates?.accuracy ? `${locationState.coordinates.accuracy}m` : "-"}</p>
             </div>
             <div className="surface-muted p-4">
-              <p className="text-xs font-black uppercase text-slate-500">Distance</p>
-              <p className="mt-2 text-sm font-black text-slate-950">
-                {locationState.decision ? `${locationState.decision.distanceMeters} meters` : "-"}
-              </p>
-              <p className="mt-1 text-xs text-slate-500">HTTPS or localhost required</p>
+              <p className="text-xs font-black uppercase text-slate-500">Map</p>
+              {locationState.coordinates ? (
+                <a className="mt-2 inline-flex items-center gap-1 text-sm font-black text-hya-700" href={googleMapsUrl(locationState.coordinates.latitude, locationState.coordinates.longitude)} target="_blank" rel="noreferrer">
+                  View Map
+                  <ExternalLink className="h-3.5 w-3.5" aria-hidden="true" />
+                </a>
+              ) : (
+                <p className="mt-2 text-sm font-black text-slate-950">Location not available</p>
+              )}
+              <p className="mt-1 text-xs text-slate-500">GPS is optional</p>
             </div>
           </div>
-          {locationState.error || (locationState.decision && !locationState.decision.inside) ? (
-            <div className="mt-4 rounded-lg border border-rose-200 bg-rose-50 p-3 text-sm font-semibold text-rose-700">
-              {locationState.decision && !locationState.decision.inside ? outsideLocationMessage : locationState.error}
+          {locationState.error ? (
+            <div className="mt-4 rounded-lg border border-amber-200 bg-amber-50 p-3 text-sm font-semibold text-amber-800">
+              {locationState.error}
             </div>
           ) : null}
-          <div className="mt-6 overflow-x-auto">
+          <div className="mt-6 hidden overflow-x-auto md:block">
             <table className="min-w-full">
               <thead className="table-head">
                 <tr>
                   <th className="px-4 py-3">Date</th>
                   <th className="px-4 py-3">In</th>
                   <th className="px-4 py-3">Out</th>
+                  <th className="px-4 py-3">Shift</th>
+                  <th className="px-4 py-3">In Location</th>
+                  <th className="px-4 py-3">Out Location</th>
                   <th className="px-4 py-3">Hours</th>
                   <th className="px-4 py-3">Status</th>
                   <th className="px-4 py-3">Updated</th>
@@ -189,6 +191,25 @@ export default function EmployeeDashboard() {
                     <td className="table-cell font-semibold text-slate-900">{formatDate(item.date)}</td>
                     <td className="table-cell">{formatTime(item.checkIn)}</td>
                     <td className="table-cell">{formatTime(item.checkOut)}</td>
+                    <td className="table-cell font-semibold">{attendanceShift(item)}</td>
+                    <td className="table-cell">
+                      <p className="font-semibold">{item.checkInLocationStatus || "Location not available"}</p>
+                      <p className="text-xs text-slate-500">{item.checkInLatitude ?? "-"}, {item.checkInLongitude ?? "-"}</p>
+                      {googleMapsUrl(item.checkInLatitude, item.checkInLongitude) ? (
+                        <a className="mt-1 inline-flex items-center gap-1 text-xs font-bold text-hya-700" href={googleMapsUrl(item.checkInLatitude, item.checkInLongitude)} target="_blank" rel="noreferrer">
+                          View Map <ExternalLink className="h-3 w-3" aria-hidden="true" />
+                        </a>
+                      ) : null}
+                    </td>
+                    <td className="table-cell">
+                      <p className="font-semibold">{item.checkOutLocationStatus || "Location not available"}</p>
+                      <p className="text-xs text-slate-500">{item.checkOutLatitude ?? "-"}, {item.checkOutLongitude ?? "-"}</p>
+                      {googleMapsUrl(item.checkOutLatitude, item.checkOutLongitude) ? (
+                        <a className="mt-1 inline-flex items-center gap-1 text-xs font-bold text-hya-700" href={googleMapsUrl(item.checkOutLatitude, item.checkOutLongitude)} target="_blank" rel="noreferrer">
+                          View Map <ExternalLink className="h-3 w-3" aria-hidden="true" />
+                        </a>
+                      ) : null}
+                    </td>
                     <td className="table-cell">{item.workingHours || 0}</td>
                     <td className="table-cell">
                       <StatusBadge status={item.status} />
@@ -200,8 +221,36 @@ export default function EmployeeDashboard() {
                 ))}
               </tbody>
             </table>
-            {!dashboard.attendanceHistory?.length ? <EmptyState title="No attendance yet" /> : null}
           </div>
+          <div className="mt-6 space-y-3 md:hidden">
+            {(dashboard.attendanceHistory || []).slice(0, 8).map((item) => (
+              <article className="rounded-lg border border-slate-200 bg-white p-4 shadow-sm shadow-slate-900/5" key={item._id}>
+                <div className="flex items-start justify-between gap-3">
+                  <div>
+                    <p className="text-sm font-black text-slate-950">{formatDate(item.date)}</p>
+                    <p className="mt-1 text-xs font-semibold text-slate-500">Shift: {attendanceShift(item)}</p>
+                  </div>
+                  <StatusBadge status={item.status} />
+                </div>
+                <div className="mt-4 grid grid-cols-2 gap-3 text-sm">
+                  <div>
+                    <p className="text-xs font-black uppercase text-slate-500">Check In</p>
+                    <p className="mt-1 font-semibold text-slate-950">{formatTime(item.checkIn)}</p>
+                  </div>
+                  <div>
+                    <p className="text-xs font-black uppercase text-slate-500">Check Out</p>
+                    <p className="mt-1 font-semibold text-slate-950">{formatTime(item.checkOut)}</p>
+                  </div>
+                </div>
+                <div className="mt-3">
+                  <p className="text-xs font-black uppercase text-slate-500">Location</p>
+                  <p className="mt-1 text-sm font-semibold text-slate-950">{item.checkInLocationStatus || "Location not available"}</p>
+                  <p className="text-xs text-slate-500">{item.checkInLatitude ?? "-"}, {item.checkInLongitude ?? "-"}</p>
+                </div>
+              </article>
+            ))}
+          </div>
+          {!dashboard.attendanceHistory?.length ? <EmptyState title="No attendance yet" /> : null}
         </div>
         <form className="panel p-5" onSubmit={applyLeave}>
           <h2 className="text-base font-bold text-slate-950">Apply Leave</h2>

@@ -13,11 +13,12 @@ const variants = {
 
 const sizes = {
   sm: "min-h-9 px-3 py-1.5 text-xs",
-  md: "min-h-10 px-4 py-2 text-sm",
-  icon: "h-10 w-10 p-0 text-sm"
+  md: "min-h-11 px-4 py-2.5 text-sm",
+  icon: "h-11 w-11 p-0 text-sm"
 };
 
 export default function Button({
+  as: Component = "button",
   children,
   className = "",
   disabled,
@@ -28,21 +29,23 @@ export default function Button({
   ...props
 }) {
   const isIconOnly = !children;
+  const isButton = Component === "button";
 
   return (
-    <button
+    <Component
       className={[
-        "inline-flex items-center justify-center gap-2 rounded-lg font-semibold transition duration-200 focus:outline-none focus:ring-4 disabled:cursor-not-allowed disabled:opacity-60",
+        "inline-flex touch-manipulation items-center justify-center gap-2 rounded-lg font-semibold transition duration-200 focus:outline-none focus:ring-4 disabled:cursor-not-allowed disabled:opacity-60",
         variants[variant],
         sizes[isIconOnly ? "icon" : size] || sizes.md,
         className
       ].join(" ")}
-      disabled={disabled}
-      type={type}
+      aria-disabled={!isButton && disabled ? "true" : undefined}
+      disabled={isButton ? disabled : undefined}
+      type={isButton ? type : undefined}
       {...props}
     >
       {Icon ? <Icon className="h-4 w-4" aria-hidden="true" /> : null}
       {children}
-    </button>
+    </Component>
   );
 }

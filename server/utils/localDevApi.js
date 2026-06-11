@@ -5,7 +5,18 @@ const jwt = require("jsonwebtoken");
 const path = require("path");
 const toCsv = require("./csv");
 const { daysBetweenInclusive, getWorkingHours, isLateCheckIn, toDateKey } = require("./dates");
-const { buildLocationDecision, validateCoordinates } = require("./geo");
+const { buildLocationDecision, normalizeAttendanceLocation, validateCoordinates } = require("./geo");
+const { getShiftFromCheckIn } = require("./shifts");
+const { fileUrl, upload } = require("../middleware/uploadMiddleware");
+const {
+  PAID_LEAVE_DAYS_PER_YEAR,
+  PAID_PERMISSION_HOURS_PER_MONTH,
+  dateRangeDays,
+  monthBounds,
+  permissionHours,
+  splitPaidAllowance,
+  yearBounds
+} = require("./requestBalances");
 const {
   buildDepartmentReport,
   buildEmployeeReport,
@@ -32,6 +43,7 @@ const createInitialData = () => ({
       employeeId: "HYA-ADMIN-001",
       department: "Administration",
       designation: "System Administrator",
+      assignedShift: "",
       phone: "9000000000",
       joiningDate: new Date().toISOString(),
       address: "HYA Tech Manufacturing Office",
@@ -50,6 +62,7 @@ const createInitialData = () => ({
       employeeId: "HYA-DEMO-HR",
       department: "HR",
       designation: "HR Executive",
+      assignedShift: "General Shift",
       phone: "9000000201",
       joiningDate: new Date().toISOString(),
       address: "HYA Tech Office",
@@ -68,6 +81,7 @@ const createInitialData = () => ({
       employeeId: "HYA-DEMO-EMP",
       department: "Production",
       designation: "Machine Operator",
+      assignedShift: "",
       phone: "9000000101",
       joiningDate: new Date().toISOString(),
       address: "HYA Tech Floor",
@@ -93,6 +107,8 @@ const createInitialData = () => ({
   attendance: [],
   leaves: [],
   permissions: [],
+  odRequests: [],
+  visitors: [],
   notifications: [],
   announcements: [
     {
@@ -122,6 +138,8 @@ let db = loadDb();
 db.notifications = db.notifications || [];
 db.announcements = db.announcements || [];
 db.attendance = db.attendance || [];
+db.odRequests = db.odRequests || [];
+db.visitors = db.visitors || [];
 db.officeLocations = db.officeLocations || [
   {
     _id: newId(),
@@ -158,7 +176,6 @@ const generateToken = (id) =>
   });
 
 const matchUser = (id) => db.users.find((user) => user._id === id && user.isActive);
-const outsideLocationMessage = "You are outside the allowed company location. Attendance cannot be marked.";
 
 const protect = (req, res, next) => {
   const authHeader = req.headers.authorization || "";
@@ -195,8 +212,8 @@ const asyncRoute = (handler) => (req, res, next) => {
 const employeeSummary = (id) => {
   const employee = db.users.find((user) => user._id === id);
   if (!employee) return null;
-  const { name, email, employeeId, department, designation, role, isActive } = employee;
-  return { _id: id, name, email, employeeId, department, designation, role, isActive };
+  const { name, email, employeeId, department, designation, assignedShift, role, isActive, profilePhoto } = employee;
+  return { _id: id, name, email, employeeId, department, designation, assignedShift, role, isActive, profilePhoto };
 };
 
 const populateAttendance = (record) => ({
@@ -303,6 +320,45 @@ const notifyUsers = ({ userIds, title, message, type = "system", createdBy }) =>
   return notifications;
 };
 
+const approvedLeaveDaysForYear = (employeeId, dateValue = new Date(), excludeId = null) => {
+  const { from, to } = yearBounds(dateValue);
+  return db.leaves
+    .filter((leave) => {
+      if (leave.status !== "Approved" || leave.employee !== employeeId || leave._id === excludeId) return false;
+      return new Date(leave.fromDate) <= to && new Date(leave.toDate) >= from;
+    })
+    .reduce((total, leave) => total + Number(leave.paidDays ?? dateRangeDays(leave.fromDate, leave.toDate)), 0);
+};
+
+const localLeaveBalance = (employeeId, dateValue = new Date()) => {
+  const used = approvedLeaveDaysForYear(employeeId, dateValue);
+  return {
+    limit: PAID_LEAVE_DAYS_PER_YEAR,
+    remaining: Math.max(PAID_LEAVE_DAYS_PER_YEAR - used, 0),
+    used
+  };
+};
+
+const approvedPermissionHoursForMonth = (employeeId, dateValue = new Date(), excludeId = null) => {
+  const { from, to } = monthBounds(dateValue);
+  return db.permissions
+    .filter((permission) => {
+      if (permission.status !== "Approved" || permission.employee !== employeeId || permission._id === excludeId) return false;
+      const date = new Date(permission.date);
+      return date >= from && date <= to;
+    })
+    .reduce((total, permission) => total + Number(permission.paidHours ?? permissionHours(permission.fromTime, permission.toTime)), 0);
+};
+
+const localPermissionBalance = (employeeId, dateValue = new Date()) => {
+  const used = approvedPermissionHoursForMonth(employeeId, dateValue);
+  return {
+    limit: PAID_PERMISSION_HOURS_PER_MONTH,
+    remaining: Math.max(PAID_PERMISSION_HOURS_PER_MONTH - used, 0),
+    used
+  };
+};
+
 const filteredAttendance = (query) => {
   let records = [...db.attendance];
   if (query.date) records = records.filter((record) => record.date === query.date);
@@ -319,33 +375,6 @@ const filteredAttendance = (query) => {
 
 const activeOfficeLocation = () =>
   [...db.officeLocations].filter((office) => office.status === "active").sort((a, b) => String(b.updatedAt).localeCompare(String(a.updatedAt)))[0];
-
-const validateLocalAttendanceLocation = (body) => {
-  let coordinates;
-  try {
-    coordinates = validateCoordinates(body);
-  } catch (error) {
-    error.statusCode = 400;
-    throw error;
-  }
-
-  const office = activeOfficeLocation();
-  if (!office) {
-    const error = new Error("No active office location is configured. Please contact admin.");
-    error.statusCode = 400;
-    throw error;
-  }
-
-  const decision = buildLocationDecision({ ...coordinates, office });
-  if (!decision.inside) {
-    const error = new Error(outsideLocationMessage);
-    error.statusCode = 403;
-    error.details = decision;
-    throw error;
-  }
-
-  return { ...coordinates, decision };
-};
 
 const orgDashboard = () => {
   const today = toDateKey();
@@ -399,6 +428,7 @@ const orgDashboard = () => {
       absentToday,
       lateToday,
       pendingLeaveRequests: db.leaves.filter((leave) => leave.status === "Pending").length,
+      pendingODRequests: db.odRequests.filter((request) => request.status === "Pending").length,
       pendingPermissionRequests: db.permissions.filter((permission) => permission.status === "Pending").length,
       totalDepartments: departments.length,
       monthlyAttendancePercentage: totalEmployees
@@ -489,6 +519,50 @@ const mountLocalDevApi = (app) => {
 
   app.get("/api/auth/me", protect, (req, res) => json(res, { user: sanitizeUser(req.user) }));
 
+  app.post(
+    "/api/uploads/image",
+    protect,
+    (req, _res, next) => {
+      req.uploadFolder = "images";
+      next();
+    },
+    upload.single("file"),
+    (req, res) => {
+      if (!req.file) return json(res, { message: "File is required" }, 400);
+      return json(res, {
+        file: {
+          filename: req.file.filename,
+          originalName: req.file.originalname,
+          mimeType: req.file.mimetype,
+          size: req.file.size,
+          url: fileUrl(req.file, "images")
+        }
+      }, 201);
+    }
+  );
+
+  app.post(
+    "/api/uploads/document",
+    protect,
+    (req, _res, next) => {
+      req.uploadFolder = "documents";
+      next();
+    },
+    upload.single("file"),
+    (req, res) => {
+      if (!req.file) return json(res, { message: "File is required" }, 400);
+      return json(res, {
+        file: {
+          filename: req.file.filename,
+          originalName: req.file.originalname,
+          mimeType: req.file.mimetype,
+          size: req.file.size,
+          url: fileUrl(req.file, "documents")
+        }
+      }, 201);
+    }
+  );
+
   app.get("/api/employees", protect, authorize("admin", "hr"), (req, res) => {
     let employees = db.users.filter((user) => user.isActive);
     if (req.query.role) employees = employees.filter((user) => user.role === req.query.role);
@@ -561,6 +635,7 @@ const mountLocalDevApi = (app) => {
         "employeeId",
         "department",
         "designation",
+        "assignedShift",
         "phone",
         "joiningDate",
         "address",
@@ -678,27 +753,28 @@ const mountLocalDevApi = (app) => {
     if (db.attendance.some((record) => record.employee === req.user._id && record.date === date)) {
       return json(res, { message: "You have already checked in today" }, 409);
     }
-    let location;
-    try {
-      location = validateLocalAttendanceLocation(req.body);
-    } catch (error) {
-      return json(res, { message: error.message, location: error.details }, error.statusCode || 400);
-    }
     const now = new Date();
+    const location = normalizeAttendanceLocation(req.body, now);
+    const shiftName = getShiftFromCheckIn(now, req.user.assignedShift);
     const attendance = {
       _id: newId(),
       employee: req.user._id,
       employeeId: req.user.employeeId || req.user._id,
       date,
       checkIn: now.toISOString(),
+      shiftName,
       checkInLatitude: location.latitude,
       checkInLongitude: location.longitude,
-      checkInLocationStatus: location.decision.status,
-      checkInDistanceMeters: location.decision.distanceMeters,
+      checkInAccuracy: location.accuracy,
+      checkInLocationStatus: location.locationStatus,
+      checkInLocationCapturedAt: location.capturedAt.toISOString(),
+      checkInDistanceMeters: null,
       checkOut: null,
       checkOutLatitude: null,
       checkOutLongitude: null,
-      checkOutLocationStatus: "Unknown",
+      checkOutAccuracy: null,
+      checkOutLocationStatus: "Location not available",
+      checkOutLocationCapturedAt: null,
       checkOutDistanceMeters: null,
       workingHours: 0,
       status: isLateCheckIn(now) ? "Late" : "Present",
@@ -709,7 +785,7 @@ const mountLocalDevApi = (app) => {
     };
     db.attendance.push(attendance);
     saveDb();
-    return json(res, { attendance, location: location.decision }, 201);
+    return json(res, { attendance, location, message: "Check-in marked successfully." }, 201);
   });
 
   app.post("/api/attendance/check-out", protect, (req, res) => {
@@ -717,23 +793,20 @@ const mountLocalDevApi = (app) => {
     const attendance = db.attendance.find((record) => record.employee === req.user._id && record.date === date);
     if (!attendance?.checkIn) return json(res, { message: "You must check in before checking out" }, 400);
     if (attendance.checkOut) return json(res, { message: "You have already checked out today" }, 409);
-    let location;
-    try {
-      location = validateLocalAttendanceLocation(req.body);
-    } catch (error) {
-      return json(res, { message: error.message, location: error.details }, error.statusCode || 400);
-    }
     const now = new Date();
+    const location = normalizeAttendanceLocation(req.body, now);
     attendance.checkOut = now.toISOString();
     attendance.checkOutLatitude = location.latitude;
     attendance.checkOutLongitude = location.longitude;
-    attendance.checkOutLocationStatus = location.decision.status;
-    attendance.checkOutDistanceMeters = location.decision.distanceMeters;
+    attendance.checkOutAccuracy = location.accuracy;
+    attendance.checkOutLocationStatus = location.locationStatus;
+    attendance.checkOutLocationCapturedAt = location.capturedAt.toISOString();
+    attendance.checkOutDistanceMeters = null;
     attendance.workingHours = getWorkingHours(attendance.checkIn, now);
     attendance.status = attendance.workingHours < 4 ? "Half Day" : attendance.status;
     attendance.updatedAt = now.toISOString();
     saveDb();
-    return json(res, { attendance, location: location.decision });
+    return json(res, { attendance, location, message: "Check-out marked successfully." });
   });
 
   app.get("/api/attendance/today", protect, (req, res) => {
@@ -742,6 +815,13 @@ const mountLocalDevApi = (app) => {
   });
 
   app.get("/api/attendance/my-history", protect, (req, res) => {
+    const attendance = db.attendance
+      .filter((record) => record.employee === req.user._id)
+      .sort((a, b) => String(b.date).localeCompare(String(a.date)));
+    return json(res, { attendance });
+  });
+
+  app.get("/api/attendance/my-attendance", protect, (req, res) => {
     const attendance = db.attendance
       .filter((record) => record.employee === req.user._id)
       .sort((a, b) => String(b.date).localeCompare(String(a.date)));
@@ -776,12 +856,17 @@ const mountLocalDevApi = (app) => {
         "Designation",
         "Check In",
         "Check Out",
+        "Shift",
         "Working Hours",
         "Status",
-        "Check In Location",
-        "Check In Distance (m)",
-        "Check Out Location",
-        "Check Out Distance (m)"
+        "Check-in Latitude",
+        "Check-in Longitude",
+        "Check-in Accuracy",
+        "Check-in Location Status",
+        "Check-out Latitude",
+        "Check-out Longitude",
+        "Check-out Accuracy",
+        "Check-out Location Status"
       ],
       ...attendance.map((record) => [
         record.date,
@@ -791,12 +876,17 @@ const mountLocalDevApi = (app) => {
         record.employee?.designation || "",
         record.checkIn || "",
         record.checkOut || "",
+        record.shiftName || getShiftFromCheckIn(record.checkIn, record.employee?.assignedShift),
         record.workingHours,
         record.status,
+        record.checkInLatitude ?? "",
+        record.checkInLongitude ?? "",
+        record.checkInAccuracy ?? "",
         record.checkInLocationStatus || "",
-        record.checkInDistanceMeters ?? "",
+        record.checkOutLatitude ?? "",
+        record.checkOutLongitude ?? "",
+        record.checkOutAccuracy ?? "",
         record.checkOutLocationStatus || "",
-        record.checkOutDistanceMeters ?? ""
       ])
     ];
     res.header("Content-Type", "text/csv");
@@ -809,6 +899,12 @@ const mountLocalDevApi = (app) => {
     if (!leaveType || !fromDate || !toDate || !reason) {
       return json(res, { message: "Leave type, from date, to date, and reason are required" }, 400);
     }
+    if (new Date(toDate) < new Date(fromDate)) {
+      return json(res, { message: "To date cannot be before from date" }, 400);
+    }
+    const requestedDays = dateRangeDays(fromDate, toDate);
+    const balance = localLeaveBalance(req.user._id, fromDate);
+    const allowance = splitPaidAllowance(requestedDays, balance.remaining);
     const leave = {
       _id: newId(),
       employee: req.user._id,
@@ -817,6 +913,12 @@ const mountLocalDevApi = (app) => {
       toDate,
       reason,
       attachment: attachment || "",
+      requestedDays,
+      paidDays: allowance.paid,
+      unpaidDays: allowance.unpaid,
+      yearlyPaidLeaveUsed: balance.used,
+      yearlyPaidLeaveRemaining: Math.max(balance.remaining - allowance.paid, 0),
+      limitExceeded: allowance.limitExceeded,
       status: "Pending",
       adminRemarks: "",
       approvedBy: null,
@@ -832,11 +934,18 @@ const mountLocalDevApi = (app) => {
       createdBy: req.user._id
     });
     saveDb();
-    return json(res, { leave }, 201);
+    return json(res, {
+      balance: { ...balance, remainingAfterRequest: Math.max(balance.remaining - allowance.paid, 0) },
+      leave,
+      warning: allowance.limitExceeded
+        ? "Yearly paid leave limit exceeded. Extra leave will be unpaid or requires special approval."
+        : ""
+    }, 201);
   });
 
   app.get("/api/leave/my-requests", protect, (req, res) => {
     return json(res, {
+      balance: localLeaveBalance(req.user._id),
       leaves: db.leaves.filter((leave) => leave.employee === req.user._id).map(populateDecision).reverse()
     });
   });
@@ -844,16 +953,34 @@ const mountLocalDevApi = (app) => {
   app.get("/api/leave/all", protect, authorize("admin", "hr"), (req, res) => {
     let leaves = [...db.leaves];
     if (req.query.status) leaves = leaves.filter((leave) => leave.status === req.query.status);
-    return json(res, { leaves: leaves.map(populateDecision).reverse() });
+    const balances = {};
+    leaves.forEach((leave) => {
+      if (!balances[leave.employee]) balances[leave.employee] = localLeaveBalance(leave.employee, leave.fromDate);
+    });
+    return json(res, { balances, leaves: leaves.map(populateDecision).reverse() });
   });
 
   const decideLeave = (status) => (req, res) => {
     const leave = db.leaves.find((item) => item._id === req.params.id);
     if (!leave) return json(res, { message: "Leave request not found" }, 404);
+    const requestedDays = Number(leave.requestedDays || dateRangeDays(leave.fromDate, leave.toDate));
+    const used = approvedLeaveDaysForYear(leave.employee, leave.fromDate, leave._id);
+    const balance = {
+      limit: PAID_LEAVE_DAYS_PER_YEAR,
+      remaining: Math.max(PAID_LEAVE_DAYS_PER_YEAR - used, 0),
+      used
+    };
+    const allowance = status === "Approved" ? splitPaidAllowance(requestedDays, balance.remaining) : { paid: leave.paidDays || 0, unpaid: leave.unpaidDays || 0, limitExceeded: leave.limitExceeded };
     leave.status = status;
     leave.adminRemarks = req.body.adminRemarks || req.body.remarks || "";
     leave.approvedBy = req.user._id;
     leave.decidedAt = new Date().toISOString();
+    leave.requestedDays = requestedDays;
+    leave.paidDays = allowance.paid;
+    leave.unpaidDays = allowance.unpaid;
+    leave.yearlyPaidLeaveUsed = balance.used;
+    leave.yearlyPaidLeaveRemaining = Math.max(balance.remaining - allowance.paid, 0);
+    leave.limitExceeded = allowance.limitExceeded;
     leave.updatedAt = new Date().toISOString();
     notifyUsers({
       userIds: [leave.employee],
@@ -863,7 +990,12 @@ const mountLocalDevApi = (app) => {
       createdBy: req.user._id
     });
     saveDb();
-    return json(res, { leave: populateDecision(leave) });
+    return json(res, {
+      leave: populateDecision(leave),
+      warning: allowance.limitExceeded
+        ? "Yearly paid leave limit exceeded. Extra leave will be unpaid or requires special approval."
+        : ""
+    });
   };
   app.put("/api/leave/:id/approve", protect, authorize("admin", "hr"), decideLeave("Approved"));
   app.put("/api/leave/:id/reject", protect, authorize("admin", "hr"), decideLeave("Rejected"));
@@ -873,6 +1005,10 @@ const mountLocalDevApi = (app) => {
     if (!permissionType || !date || !fromTime || !toTime || !reason) {
       return json(res, { message: "Permission type, date, from time, to time, and reason are required" }, 400);
     }
+    const requestedHours = permissionHours(fromTime, toTime);
+    if (requestedHours <= 0) return json(res, { message: "To time must be after from time" }, 400);
+    const balance = localPermissionBalance(req.user._id, date);
+    const allowance = splitPaidAllowance(requestedHours, balance.remaining);
     const permission = {
       _id: newId(),
       employee: req.user._id,
@@ -881,6 +1017,12 @@ const mountLocalDevApi = (app) => {
       fromTime,
       toTime,
       reason,
+      requestedHours,
+      paidHours: allowance.paid,
+      unpaidHours: allowance.unpaid,
+      monthlyPaidPermissionUsed: balance.used,
+      monthlyPaidPermissionRemaining: Math.max(balance.remaining - allowance.paid, 0),
+      limitExceeded: allowance.limitExceeded,
       status: "Pending",
       adminRemarks: "",
       approvedBy: null,
@@ -896,11 +1038,18 @@ const mountLocalDevApi = (app) => {
       createdBy: req.user._id
     });
     saveDb();
-    return json(res, { permission }, 201);
+    return json(res, {
+      balance: { ...balance, remainingAfterRequest: Math.max(balance.remaining - allowance.paid, 0) },
+      permission,
+      warning: allowance.limitExceeded
+        ? "Monthly paid permission limit exceeded. Extra permission will be unpaid or requires special approval."
+        : ""
+    }, 201);
   });
 
   app.get("/api/permission/my-requests", protect, (req, res) => {
     return json(res, {
+      balance: localPermissionBalance(req.user._id),
       permissions: db.permissions.filter((permission) => permission.employee === req.user._id).map(populateDecision).reverse()
     });
   });
@@ -908,16 +1057,34 @@ const mountLocalDevApi = (app) => {
   app.get("/api/permission/all", protect, authorize("admin", "hr"), (req, res) => {
     let permissions = [...db.permissions];
     if (req.query.status) permissions = permissions.filter((permission) => permission.status === req.query.status);
-    return json(res, { permissions: permissions.map(populateDecision).reverse() });
+    const balances = {};
+    permissions.forEach((permission) => {
+      if (!balances[permission.employee]) balances[permission.employee] = localPermissionBalance(permission.employee, permission.date);
+    });
+    return json(res, { balances, permissions: permissions.map(populateDecision).reverse() });
   });
 
   const decidePermission = (status) => (req, res) => {
     const permission = db.permissions.find((item) => item._id === req.params.id);
     if (!permission) return json(res, { message: "Permission request not found" }, 404);
+    const requestedHours = Number(permission.requestedHours || permissionHours(permission.fromTime, permission.toTime));
+    const used = approvedPermissionHoursForMonth(permission.employee, permission.date, permission._id);
+    const balance = {
+      limit: PAID_PERMISSION_HOURS_PER_MONTH,
+      remaining: Math.max(PAID_PERMISSION_HOURS_PER_MONTH - used, 0),
+      used
+    };
+    const allowance = status === "Approved" ? splitPaidAllowance(requestedHours, balance.remaining) : { paid: permission.paidHours || 0, unpaid: permission.unpaidHours || 0, limitExceeded: permission.limitExceeded };
     permission.status = status;
     permission.adminRemarks = req.body.adminRemarks || req.body.remarks || "";
     permission.approvedBy = req.user._id;
     permission.decidedAt = new Date().toISOString();
+    permission.requestedHours = requestedHours;
+    permission.paidHours = allowance.paid;
+    permission.unpaidHours = allowance.unpaid;
+    permission.monthlyPaidPermissionUsed = balance.used;
+    permission.monthlyPaidPermissionRemaining = Math.max(balance.remaining - allowance.paid, 0);
+    permission.limitExceeded = allowance.limitExceeded;
     permission.updatedAt = new Date().toISOString();
     notifyUsers({
       userIds: [permission.employee],
@@ -927,10 +1094,182 @@ const mountLocalDevApi = (app) => {
       createdBy: req.user._id
     });
     saveDb();
-    return json(res, { permission: populateDecision(permission) });
+    return json(res, {
+      permission: populateDecision(permission),
+      warning: allowance.limitExceeded
+        ? "Monthly paid permission limit exceeded. Extra permission will be unpaid or requires special approval."
+        : ""
+    });
   };
   app.put("/api/permission/:id/approve", protect, authorize("admin", "hr"), decidePermission("Approved"));
   app.put("/api/permission/:id/reject", protect, authorize("admin", "hr"), decidePermission("Rejected"));
+
+  app.get("/api/visitors", protect, authorize("admin", "hr"), (req, res) => {
+    let visitors = [...db.visitors];
+    if (req.query.date) {
+      visitors = visitors.filter((visitor) => String(visitor.visitDate || "").slice(0, 10) === req.query.date);
+    }
+    visitors.sort((a, b) => String(b.visitDate).localeCompare(String(a.visitDate)));
+    return json(res, { visitors });
+  });
+
+  app.post("/api/visitors", protect, authorize("admin", "hr"), (req, res) => {
+    const { visitorName, mobileNumber, purposeOfVisit, personToMeet, visitDate } = req.body;
+    if (!visitorName || !mobileNumber || !purposeOfVisit || !personToMeet || !visitDate) {
+      return json(res, { message: "Visitor name, mobile number, purpose, person to meet, and visit date are required" }, 400);
+    }
+    const now = new Date().toISOString();
+    const visitor = {
+      _id: newId(),
+      checkInTime: req.body.checkInTime || null,
+      checkOutTime: req.body.checkOutTime || null,
+      companyName: req.body.companyName || "",
+      createdAt: now,
+      createdBy: req.user._id,
+      mobileNumber,
+      personToMeet,
+      purposeOfVisit,
+      remarks: req.body.remarks || "",
+      updatedAt: now,
+      updatedBy: req.user._id,
+      visitDate,
+      visitorImage: req.body.visitorImage || "",
+      visitorName
+    };
+    db.visitors.push(visitor);
+    saveDb();
+    return json(res, { visitor }, 201);
+  });
+
+  app.put("/api/visitors/:id", protect, authorize("admin", "hr"), (req, res) => {
+    const visitor = db.visitors.find((item) => item._id === req.params.id);
+    if (!visitor) return json(res, { message: "Visitor record not found" }, 404);
+    [
+      "checkInTime",
+      "checkOutTime",
+      "companyName",
+      "mobileNumber",
+      "personToMeet",
+      "purposeOfVisit",
+      "remarks",
+      "visitDate",
+      "visitorImage",
+      "visitorName"
+    ].forEach((field) => {
+      if (Object.prototype.hasOwnProperty.call(req.body, field)) visitor[field] = req.body[field];
+    });
+    visitor.updatedAt = new Date().toISOString();
+    visitor.updatedBy = req.user._id;
+    saveDb();
+    return json(res, { visitor });
+  });
+
+  app.delete("/api/visitors/:id", protect, authorize("admin", "hr"), (req, res) => {
+    const existing = db.visitors.find((item) => item._id === req.params.id);
+    if (!existing) return json(res, { message: "Visitor record not found" }, 404);
+    db.visitors = db.visitors.filter((item) => item._id !== req.params.id);
+    saveDb();
+    return json(res, { message: "Visitor record deleted" });
+  });
+
+  app.post("/api/od/apply", protect, (req, res) => {
+    const { odDate, fromTime, toTime, reason, location } = req.body;
+    if (!odDate || !fromTime || !toTime || !reason || !location) {
+      return json(res, { message: "OD date, from time, to time, reason, and location are required" }, 400);
+    }
+    const now = new Date().toISOString();
+    const od = {
+      _id: newId(),
+      adminRemarks: "",
+      approvedBy: null,
+      attachment: req.body.attachment || "",
+      createdAt: now,
+      employee: req.user._id,
+      fromTime,
+      location,
+      odDate,
+      reason,
+      status: "Pending",
+      toTime,
+      updatedAt: now
+    };
+    db.odRequests.push(od);
+    notifyUsers({
+      userIds: db.users.filter((user) => user.isActive && ["admin", "hr"].includes(user.role)).map((user) => user._id),
+      title: "New OD request",
+      message: `${req.user.name} requested OD on ${odDate}.`,
+      type: "od",
+      createdBy: req.user._id
+    });
+    saveDb();
+    return json(res, { od }, 201);
+  });
+
+  app.get("/api/od/my-requests", protect, (req, res) => {
+    return json(res, {
+      requests: db.odRequests.filter((request) => request.employee === req.user._id).map(populateDecision).reverse()
+    });
+  });
+
+  app.get("/api/od/all", protect, authorize("admin", "hr"), (req, res) => {
+    let requests = [...db.odRequests];
+    if (req.query.status) requests = requests.filter((request) => request.status === req.query.status);
+    return json(res, { requests: requests.map(populateDecision).reverse() });
+  });
+
+  const decideOd = (status) => (req, res) => {
+    const od = db.odRequests.find((item) => item._id === req.params.id);
+    if (!od) return json(res, { message: "OD request not found" }, 404);
+    od.status = status;
+    od.adminRemarks = req.body.adminRemarks || req.body.remarks || "";
+    od.approvedBy = req.user._id;
+    od.decidedAt = new Date().toISOString();
+    od.updatedAt = new Date().toISOString();
+
+    if (status === "Approved") {
+      const employee = employeeSummary(od.employee);
+      const date = toDateKey(new Date(od.odDate));
+      let attendance = db.attendance.find((record) => record.employee === od.employee && record.date === date);
+      if (!attendance) {
+        attendance = {
+          _id: newId(),
+          employee: od.employee,
+          employeeId: employee?.employeeId || od.employee,
+          date,
+          checkIn: `${date}T${od.fromTime}:00.000Z`,
+          checkOut: `${date}T${od.toTime}:00.000Z`,
+          shiftName: "OD",
+          checkInLatitude: null,
+          checkInLongitude: null,
+          checkInAccuracy: null,
+          checkInLocationStatus: "Location not available",
+          checkOutLatitude: null,
+          checkOutLongitude: null,
+          checkOutAccuracy: null,
+          checkOutLocationStatus: "Location not available",
+          workingHours: 0,
+          createdAt: new Date().toISOString()
+        };
+        db.attendance.push(attendance);
+      }
+      attendance.status = "OD";
+      attendance.remarks = `OD Approved: ${od.location} - ${od.reason}`;
+      attendance.updatedAt = new Date().toISOString();
+    }
+
+    notifyUsers({
+      userIds: [od.employee],
+      title: `OD ${status.toLowerCase()}`,
+      message: `Your OD request was ${status.toLowerCase()} by ${req.user.name}.`,
+      type: "od",
+      createdBy: req.user._id
+    });
+    saveDb();
+    return json(res, { od: populateDecision(od) });
+  };
+
+  app.put("/api/od/:id/approve", protect, authorize("admin", "hr"), decideOd("Approved"));
+  app.put("/api/od/:id/reject", protect, authorize("admin", "hr"), decideOd("Rejected"));
 
   app.get("/api/announcements", protect, (req, res) => {
     const announcements = db.announcements
@@ -996,6 +1335,8 @@ const mountLocalDevApi = (app) => {
   app.get("/api/notifications/counts", protect, (req, res) => {
     if (["admin", "hr"].includes(req.user.role)) {
       return json(res, {
+        odUpdateCount: 0,
+        pendingODCount: db.odRequests.filter((request) => request.status === "Pending").length,
         pendingLeaveCount: db.leaves.filter((leave) => leave.status === "Pending").length,
         pendingPermissionCount: db.permissions.filter((permission) => permission.status === "Pending").length,
         leaveUpdateCount: 0,
@@ -1004,6 +1345,10 @@ const mountLocalDevApi = (app) => {
     }
 
     return json(res, {
+      odUpdateCount: db.notifications.filter(
+        (notification) => notification.user === req.user._id && notification.type === "od" && !notification.isRead
+      ).length,
+      pendingODCount: 0,
       pendingLeaveCount: 0,
       pendingPermissionCount: 0,
       leaveUpdateCount: db.notifications.filter(
@@ -1052,16 +1397,19 @@ const mountLocalDevApi = (app) => {
   app.get("/api/dashboard/employee", protect, (req, res) => {
     const today = toDateKey();
     const attendance = db.attendance.find((record) => record.employee === req.user._id && record.date === today);
-    const approvedLeaves = db.leaves.filter((leave) => leave.employee === req.user._id && leave.status === "Approved");
-    const usedLeaves = approvedLeaves.reduce((total, leave) => total + daysBetweenInclusive(leave.fromDate, leave.toDate), 0);
+    const leaveBalance = localLeaveBalance(req.user._id);
+    const permissionBalance = localPermissionBalance(req.user._id);
     return json(res, {
       todayStatus: attendance?.status || "Absent",
       attendance: attendance || null,
       workingHoursToday: attendance?.workingHours || 0,
-      leaveBalance: Math.max(12 - usedLeaves, 0),
+      leaveBalance: leaveBalance.remaining,
+      leaveBalanceDetails: leaveBalance,
+      permissionBalance,
       pendingRequests:
         db.leaves.filter((leave) => leave.employee === req.user._id && leave.status === "Pending").length +
-        db.permissions.filter((permission) => permission.employee === req.user._id && permission.status === "Pending").length,
+        db.permissions.filter((permission) => permission.employee === req.user._id && permission.status === "Pending").length +
+        db.odRequests.filter((request) => request.employee === req.user._id && request.status === "Pending").length,
       attendanceHistory: db.attendance
         .filter((record) => record.employee === req.user._id)
         .sort((a, b) => String(b.date).localeCompare(String(a.date))),

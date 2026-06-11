@@ -1,10 +1,13 @@
 const Announcement = require("../models/Announcement");
 const Attendance = require("../models/Attendance");
 const LeaveRequest = require("../models/LeaveRequest");
+const ODRequest = require("../models/ODRequest");
 const PermissionRequest = require("../models/PermissionRequest");
 const User = require("../models/User");
 const asyncHandler = require("../utils/asyncHandler");
 const { daysBetweenInclusive, toDateKey } = require("../utils/dates");
+const { leaveBalanceForEmployee } = require("./leaveController");
+const { permissionBalanceForEmployee } = require("./permissionController");
 
 const lastSevenDateKeys = () => {
   const dates = [];
@@ -38,6 +41,7 @@ const buildOrgDashboard = async () => {
   const absentToday = Math.max(totalEmployees - presentToday, 0);
   const pendingLeaveRequests = await LeaveRequest.countDocuments({ status: "Pending" });
   const pendingPermissionRequests = await PermissionRequest.countDocuments({ status: "Pending" });
+  const pendingODRequests = await ODRequest.countDocuments({ status: "Pending" });
   const departments = [...new Set(activeEmployees.map((employee) => employee.department).filter(Boolean))];
 
   const dateKeys = lastSevenDateKeys();
@@ -89,6 +93,7 @@ const buildOrgDashboard = async () => {
       absentToday,
       lateToday,
       pendingLeaveRequests,
+      pendingODRequests,
       pendingPermissionRequests,
       totalDepartments: departments.length,
       monthlyAttendancePercentage
@@ -109,28 +114,27 @@ const hrDashboard = asyncHandler(async (req, res) => {
 
 const employeeDashboard = asyncHandler(async (req, res) => {
   const today = toDateKey();
-  const [attendance, history, pendingLeaves, pendingPermissions, announcements, approvedLeaves] =
+  const [attendance, history, pendingLeaves, pendingPermissions, pendingODRequests, announcements] =
     await Promise.all([
       Attendance.findOne({ employee: req.user._id, date: today }),
       Attendance.find({ employee: req.user._id }).sort({ date: -1 }).limit(30),
       LeaveRequest.countDocuments({ employee: req.user._id, status: "Pending" }),
       PermissionRequest.countDocuments({ employee: req.user._id, status: "Pending" }),
-      Announcement.find({ targetRole: { $in: ["all", "employee"] } }).sort({ createdAt: -1 }).limit(5),
-      LeaveRequest.find({ employee: req.user._id, status: "Approved" })
+      ODRequest.countDocuments({ employee: req.user._id, status: "Pending" }),
+      Announcement.find({ targetRole: { $in: ["all", "employee"] } }).sort({ createdAt: -1 }).limit(5)
     ]);
 
-  const currentYear = new Date().getFullYear();
-  const usedLeaves = approvedLeaves.reduce((total, leave) => {
-    if (new Date(leave.fromDate).getFullYear() !== currentYear) return total;
-    return total + daysBetweenInclusive(leave.fromDate, leave.toDate);
-  }, 0);
+  const leaveBalance = await leaveBalanceForEmployee(req.user._id);
+  const permissionBalance = await permissionBalanceForEmployee(req.user._id);
 
   res.json({
     todayStatus: attendance?.status || "Absent",
     attendance,
     workingHoursToday: attendance?.workingHours || 0,
-    leaveBalance: Math.max(12 - usedLeaves, 0),
-    pendingRequests: pendingLeaves + pendingPermissions,
+    leaveBalance: leaveBalance.remaining,
+    leaveBalanceDetails: leaveBalance,
+    permissionBalance,
+    pendingRequests: pendingLeaves + pendingPermissions + pendingODRequests,
     attendanceHistory: history,
     announcements
   });

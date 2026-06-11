@@ -19,7 +19,7 @@ const notificationSchema = new mongoose.Schema(
     },
     type: {
       type: String,
-      enum: ["announcement", "leave", "permission", "attendance", "system"],
+      enum: ["announcement", "leave", "permission", "od", "attendance", "system"],
       default: "system"
     },
     isRead: {

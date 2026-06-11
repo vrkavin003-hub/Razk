@@ -2,6 +2,7 @@ const fs = require("fs");
 const path = require("path");
 const PDFDocument = require("pdfkit");
 const { toDateKey } = require("./dates");
+const { getShiftFromCheckIn } = require("./shifts");
 
 const logoPath = path.join(__dirname, "..", "assets", "hya-logo.png");
 
@@ -102,10 +103,19 @@ const buildDailyRecords = ({ employee, attendance, leaves, from, to }) =>
       day: dayName(dateKey),
       checkIn: attendanceRecord?.checkIn || attendanceRecord?.checkInTime || null,
       checkOut: attendanceRecord?.checkOut || attendanceRecord?.checkOutTime || null,
+      shiftName:
+        attendanceRecord?.shiftName ||
+        getShiftFromCheckIn(attendanceRecord?.checkIn || attendanceRecord?.checkInTime, employee?.assignedShift),
       workingHours: Number(attendanceRecord?.workingHours || 0),
       checkInLocationStatus: attendanceRecord?.checkInLocationStatus || "Unknown",
+      checkInLatitude: attendanceRecord?.checkInLatitude ?? "",
+      checkInLongitude: attendanceRecord?.checkInLongitude ?? "",
+      checkInAccuracy: attendanceRecord?.checkInAccuracy ?? "",
       checkInDistanceMeters: attendanceRecord?.checkInDistanceMeters ?? "",
       checkOutLocationStatus: attendanceRecord?.checkOutLocationStatus || "Unknown",
+      checkOutLatitude: attendanceRecord?.checkOutLatitude ?? "",
+      checkOutLongitude: attendanceRecord?.checkOutLongitude ?? "",
+      checkOutAccuracy: attendanceRecord?.checkOutAccuracy ?? "",
       checkOutDistanceMeters: attendanceRecord?.checkOutDistanceMeters ?? "",
       status,
       statusCode: statusCode(status),
@@ -410,23 +420,24 @@ const renderEmployeePdf = (doc, report) => {
   drawTable(
     doc,
     [
-      { key: "date", label: "Date", width: 68 },
-      { key: "day", label: "Day", width: 34 },
-      { key: "checkInText", label: "Check-in", width: 58 },
-      { key: "checkOutText", label: "Check-out", width: 58 },
-      { key: "workingHours", label: "Hrs", width: 34 },
-      { key: "status", label: "Status", width: 54 },
+      { key: "date", label: "Date", width: 64 },
+      { key: "day", label: "Day", width: 30 },
+      { key: "checkInText", label: "Check-in", width: 54 },
+      { key: "checkOutText", label: "Check-out", width: 54 },
+      { key: "shiftName", label: "Shift", width: 60 },
+      { key: "workingHours", label: "Hrs", width: 30 },
+      { key: "status", label: "Status", width: 48 },
       { key: "checkInGps", label: "In GPS", width: 58 },
       { key: "checkOutGps", label: "Out GPS", width: 58 },
-      { key: "remarks", label: "Remarks", width: 78 }
+      { key: "remarks", label: "Remarks", width: 36 }
     ],
     report.records.map((record) => ({
       ...record,
       date: formatDate(record.date),
       checkInText: formatTime(record.checkIn),
       checkOutText: formatTime(record.checkOut),
-      checkInGps: record.checkInDistanceMeters !== "" ? `${record.checkInLocationStatus} ${record.checkInDistanceMeters}m` : "-",
-      checkOutGps: record.checkOutDistanceMeters !== "" ? `${record.checkOutLocationStatus} ${record.checkOutDistanceMeters}m` : "-"
+      checkInGps: record.checkInLatitude !== "" ? `${record.checkInLatitude}, ${record.checkInLongitude}` : record.checkInLocationStatus,
+      checkOutGps: record.checkOutLatitude !== "" ? `${record.checkOutLatitude}, ${record.checkOutLongitude}` : record.checkOutLocationStatus
     })),
     y
   );

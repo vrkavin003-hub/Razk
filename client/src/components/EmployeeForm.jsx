@@ -1,8 +1,11 @@
 import { useMemo, useState } from "react";
 import Button from "./Button";
+import FileUploadField from "./FileUploadField";
+import UserAvatar from "./UserAvatar";
 
 const departments = ["Production", "Quality", "Maintenance", "Stores", "Administration", "HR", "Finance"];
 const roles = ["employee", "hr", "admin"];
+const shifts = ["", "1st Shift", "2nd Shift", "3rd Shift", "General Shift"];
 
 export default function EmployeeForm({ initialValue, isEdit = false, onSubmit }) {
   const defaults = useMemo(
@@ -13,6 +16,7 @@ export default function EmployeeForm({ initialValue, isEdit = false, onSubmit })
       phone: "",
       department: "Production",
       designation: "",
+      assignedShift: "",
       joiningDate: "",
       address: "",
       emergencyContact: "",
@@ -71,6 +75,16 @@ export default function EmployeeForm({ initialValue, isEdit = false, onSubmit })
           <input className="form-input" value={form.designation || ""} onChange={update("designation")} />
         </label>
         <label className="space-y-1">
+          <span className="form-label">Assigned Shift</span>
+          <select className="form-input" value={form.assignedShift || ""} onChange={update("assignedShift")}>
+            {shifts.map((shift) => (
+              <option key={shift || "auto"} value={shift}>
+                {shift || "Auto by check-in time"}
+              </option>
+            ))}
+          </select>
+        </label>
+        <label className="space-y-1">
           <span className="form-label">Joining Date</span>
           <input
             className="form-input"
@@ -97,10 +111,16 @@ export default function EmployeeForm({ initialValue, isEdit = false, onSubmit })
           <span className="form-label">Emergency Contact</span>
           <input className="form-input" value={form.emergencyContact || ""} onChange={update("emergencyContact")} />
         </label>
-        <label className="space-y-1">
-          <span className="form-label">Profile Photo URL</span>
-          <input className="form-input" value={form.profilePhoto || ""} onChange={update("profilePhoto")} />
-        </label>
+        <div className="space-y-2">
+          <span className="form-label">Profile Image</span>
+          <div className="flex items-center gap-3 rounded-lg border border-slate-200 bg-slate-50 p-3">
+            <UserAvatar name={form.name} photo={form.profilePhoto} size="lg" />
+            <div>
+              <FileUploadField label="Upload image" onUploaded={(url) => setForm((current) => ({ ...current, profilePhoto: url }))} />
+              <p className="mt-1 text-xs text-slate-500">Choose an employee image from this device.</p>
+            </div>
+          </div>
+        </div>
         <label className="space-y-1 md:col-span-2">
           <span className="form-label">{isEdit ? "New Password" : "Password"}</span>
           <input

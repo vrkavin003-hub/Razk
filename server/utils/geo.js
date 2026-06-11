@@ -49,6 +49,44 @@ const validateCoordinates = ({ latitude, longitude }) => ({
   longitude: assertLongitude(longitude)
 });
 
+const optionalNumber = (value) => {
+  if (value === undefined || value === null || value === "") return null;
+  const number = Number(value);
+  return Number.isFinite(number) ? number : null;
+};
+
+const normalizeAttendanceLocation = (body = {}, capturedAt = new Date()) => {
+  const latitude = optionalNumber(body.latitude);
+  const longitude = optionalNumber(body.longitude);
+  const accuracy = optionalNumber(body.accuracy);
+  const requestedStatus = String(body.locationStatus || body.location_status || "").trim();
+  const hasValidCoordinates =
+    latitude !== null && longitude !== null && latitude >= -90 && latitude <= 90 && longitude >= -180 && longitude <= 180;
+
+  let locationStatus = requestedStatus;
+  if (!locationStatus) {
+    locationStatus = hasValidCoordinates ? "Captured" : "Location not available";
+  }
+
+  if (!hasValidCoordinates) {
+    return {
+      accuracy: null,
+      capturedAt,
+      latitude: null,
+      longitude: null,
+      locationStatus
+    };
+  }
+
+  return {
+    accuracy,
+    capturedAt,
+    latitude,
+    longitude,
+    locationStatus: locationStatus === "Permission denied" ? "Permission denied" : "Captured"
+  };
+};
+
 const buildLocationDecision = ({ office, latitude, longitude }) => {
   if (!office) {
     const error = new Error("No active office location is configured");
@@ -75,5 +113,6 @@ module.exports = {
   assertLongitude,
   buildLocationDecision,
   calculateDistanceMeters,
+  normalizeAttendanceLocation,
   validateCoordinates
 };

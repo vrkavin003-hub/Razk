@@ -2,7 +2,9 @@ import { Save } from "lucide-react";
 import { useState } from "react";
 import toast from "react-hot-toast";
 import Button from "../components/Button";
+import FileUploadField from "../components/FileUploadField";
 import PageHeader from "../components/PageHeader";
+import UserAvatar from "../components/UserAvatar";
 import { useAuth } from "../context/AuthContext";
 import api from "../services/api";
 
@@ -62,10 +64,16 @@ export default function EmployeeProfile() {
             <span className="form-label">Emergency Contact</span>
             <input className="form-input" value={form.emergencyContact} onChange={update("emergencyContact")} />
           </label>
-          <label className="space-y-1">
-            <span className="form-label">Profile Photo URL</span>
-            <input className="form-input" value={form.profilePhoto} onChange={update("profilePhoto")} />
-          </label>
+          <div className="space-y-2">
+            <span className="form-label">Profile Image</span>
+            <div className="flex items-center gap-3 rounded-lg border border-slate-200 bg-slate-50 p-3">
+              <UserAvatar name={form.name || user?.name} photo={form.profilePhoto} size="lg" />
+              <div>
+                <FileUploadField label="Upload image" onUploaded={(url) => setForm((current) => ({ ...current, profilePhoto: url }))} />
+                <p className="mt-1 text-xs text-slate-500">Choose an image from this device.</p>
+              </div>
+            </div>
+          </div>
         </div>
         <Button className="mt-5" disabled={saving} icon={Save} type="submit">
           Save Profile

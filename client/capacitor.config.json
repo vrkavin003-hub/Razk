@@ -1,0 +1,9 @@
+{
+  "appId": "com.hyatech.attendance",
+  "appName": "HYA Attendance",
+  "webDir": "dist",
+  "bundledWebRuntime": false,
+  "server": {
+    "androidScheme": "https"
+  }
+}

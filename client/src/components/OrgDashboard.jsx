@@ -1,5 +1,6 @@
 import {
   AlertTriangle,
+  Briefcase,
   Building2,
   CalendarDays,
   Clock3,
@@ -52,10 +53,12 @@ export default function OrgDashboard({ endpoint, title }) {
     ["Late Today", cards.lateToday, Clock3, "amber"],
     ["Pending Leave", cards.pendingLeaveRequests, FileClock, "amber"],
     ["Pending Permission", cards.pendingPermissionRequests, Gauge, "slate"],
+    ["Pending OD", cards.pendingODRequests, Briefcase, "blue"],
     ["Departments", cards.totalDepartments, Building2, "blue"],
     ["Monthly Attendance", `${cards.monthlyAttendancePercentage || 0}%`, TrendingUp, "green"]
   ];
-  const pendingTotal = (cards.pendingLeaveRequests || 0) + (cards.pendingPermissionRequests || 0);
+  const pendingTotal =
+    (cards.pendingLeaveRequests || 0) + (cards.pendingPermissionRequests || 0) + (cards.pendingODRequests || 0);
 
   return (
     <>

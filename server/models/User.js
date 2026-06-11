@@ -40,6 +40,11 @@ const userSchema = new mongoose.Schema(
       type: String,
       trim: true
     },
+    assignedShift: {
+      type: String,
+      enum: ["", "1st Shift", "2nd Shift", "3rd Shift", "General Shift"],
+      default: ""
+    },
     phone: {
       type: String,
       trim: true

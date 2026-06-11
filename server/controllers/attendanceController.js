@@ -1,12 +1,10 @@
 const Attendance = require("../models/Attendance");
-const OfficeLocation = require("../models/OfficeLocation");
 const User = require("../models/User");
 const asyncHandler = require("../utils/asyncHandler");
 const toCsv = require("../utils/csv");
 const { getWorkingHours, isLateCheckIn, toDateKey } = require("../utils/dates");
-const { buildLocationDecision, validateCoordinates } = require("../utils/geo");
-
-const outsideLocationMessage = "You are outside the allowed company location. Attendance cannot be marked.";
+const { normalizeAttendanceLocation } = require("../utils/geo");
+const { getShiftFromCheckIn } = require("../utils/shifts");
 
 const buildAttendanceQuery = async (filters = {}) => {
   const query = {};
@@ -25,31 +23,6 @@ const buildAttendanceQuery = async (filters = {}) => {
   return query;
 };
 
-const validateAttendanceLocation = async (body) => {
-  const { latitude, longitude } = validateCoordinates(body);
-  const office = await OfficeLocation.findOne({ status: "active" }).sort({ updatedAt: -1 });
-
-  if (!office) {
-    const error = new Error("No active office location is configured. Please contact admin.");
-    error.statusCode = 400;
-    throw error;
-  }
-
-  const decision = buildLocationDecision({ latitude, longitude, office });
-  if (!decision.inside) {
-    const error = new Error(outsideLocationMessage);
-    error.statusCode = 403;
-    error.details = decision;
-    throw error;
-  }
-
-  return {
-    decision,
-    latitude,
-    longitude
-  };
-};
-
 const checkIn = asyncHandler(async (req, res) => {
   const date = toDateKey();
   const existing = await Attendance.findOne({ employee: req.user._id, date });
@@ -59,23 +32,27 @@ const checkIn = asyncHandler(async (req, res) => {
     throw new Error("You have already checked in today");
   }
 
-  const location = await validateAttendanceLocation(req.body);
   const now = new Date();
+  const location = normalizeAttendanceLocation(req.body, now);
+  const shiftName = getShiftFromCheckIn(now, req.user.assignedShift);
   const attendance = await Attendance.create({
     employee: req.user._id,
     employeeId: req.user.employeeId || String(req.user._id),
     date,
     checkIn: now,
+    shiftName,
     checkInLatitude: location.latitude,
     checkInLongitude: location.longitude,
-    checkInLocationStatus: location.decision.status,
-    checkInDistanceMeters: location.decision.distanceMeters,
+    checkInAccuracy: location.accuracy,
+    checkInLocationStatus: location.locationStatus,
+    checkInLocationCapturedAt: location.capturedAt,
+    checkInDistanceMeters: null,
     status: isLateCheckIn(now) ? "Late" : "Present",
     locationNote: req.body.locationNote,
     remarks: req.body.remarks
   });
 
-  res.status(201).json({ attendance, location: location.decision });
+  res.status(201).json({ attendance, location, message: "Check-in marked successfully." });
 });
 
 const checkOut = asyncHandler(async (req, res) => {
@@ -98,18 +75,20 @@ const checkOut = asyncHandler(async (req, res) => {
     throw new Error("Check-out cannot be before check-in");
   }
 
-  const location = await validateAttendanceLocation(req.body);
   attendance.checkOut = now;
+  const location = normalizeAttendanceLocation(req.body, now);
   attendance.checkOutLatitude = location.latitude;
   attendance.checkOutLongitude = location.longitude;
-  attendance.checkOutLocationStatus = location.decision.status;
-  attendance.checkOutDistanceMeters = location.decision.distanceMeters;
+  attendance.checkOutAccuracy = location.accuracy;
+  attendance.checkOutLocationStatus = location.locationStatus;
+  attendance.checkOutLocationCapturedAt = location.capturedAt;
+  attendance.checkOutDistanceMeters = null;
   attendance.workingHours = getWorkingHours(attendance.checkIn, now);
   attendance.status = attendance.workingHours < 4 ? "Half Day" : attendance.status;
   attendance.remarks = req.body.remarks || attendance.remarks;
   await attendance.save();
 
-  res.json({ attendance, location: location.decision });
+  res.json({ attendance, location, message: "Check-out marked successfully." });
 });
 
 const getTodayAttendance = asyncHandler(async (req, res) => {
@@ -132,7 +111,7 @@ const getMyHistory = asyncHandler(async (req, res) => {
 const getAllAttendance = asyncHandler(async (req, res) => {
   const query = await buildAttendanceQuery(req.query);
   const attendance = await Attendance.find(query)
-    .populate("employee", "name email employeeId department designation")
+    .populate("employee", "name email employeeId department designation assignedShift profilePhoto")
     .sort({ date: -1, createdAt: -1 });
 
   res.json({ attendance });
@@ -142,7 +121,7 @@ const getReport = asyncHandler(async (req, res) => {
   const query = await buildAttendanceQuery(req.query);
   const attendance = await Attendance.find(query).populate(
     "employee",
-    "name email employeeId department designation"
+    "name email employeeId department designation assignedShift profilePhoto"
   );
 
   const summary = attendance.reduce(
@@ -160,7 +139,7 @@ const getReport = asyncHandler(async (req, res) => {
 const exportCsv = asyncHandler(async (req, res) => {
   const query = await buildAttendanceQuery(req.query);
   const attendance = await Attendance.find(query)
-    .populate("employee", "name email employeeId department designation")
+    .populate("employee", "name email employeeId department designation assignedShift profilePhoto")
     .sort({ date: -1 });
 
   const rows = [
@@ -172,12 +151,17 @@ const exportCsv = asyncHandler(async (req, res) => {
       "Designation",
       "Check In",
       "Check Out",
+      "Shift",
       "Working Hours",
       "Status",
-      "Check In Location",
-      "Check In Distance (m)",
-      "Check Out Location",
-      "Check Out Distance (m)",
+      "Check-in Latitude",
+      "Check-in Longitude",
+      "Check-in Accuracy",
+      "Check-in Location Status",
+      "Check-out Latitude",
+      "Check-out Longitude",
+      "Check-out Accuracy",
+      "Check-out Location Status",
       "Remarks"
     ],
     ...attendance.map((item) => [
@@ -188,12 +172,17 @@ const exportCsv = asyncHandler(async (req, res) => {
       item.employee?.designation || "",
       item.checkIn ? item.checkIn.toISOString() : "",
       item.checkOut ? item.checkOut.toISOString() : "",
+      item.shiftName || getShiftFromCheckIn(item.checkIn, item.employee?.assignedShift),
       item.workingHours,
       item.status,
+      item.checkInLatitude ?? "",
+      item.checkInLongitude ?? "",
+      item.checkInAccuracy ?? "",
       item.checkInLocationStatus || "",
-      item.checkInDistanceMeters ?? "",
+      item.checkOutLatitude ?? "",
+      item.checkOutLongitude ?? "",
+      item.checkOutAccuracy ?? "",
       item.checkOutLocationStatus || "",
-      item.checkOutDistanceMeters ?? "",
       item.remarks || ""
     ])
   ];

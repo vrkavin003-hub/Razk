@@ -18,14 +18,18 @@ const getNotifications = asyncHandler(async (req, res) => {
 
 const getNotificationCounts = asyncHandler(async (req, res) => {
   const LeaveRequest = require("../models/LeaveRequest");
+  const ODRequest = require("../models/ODRequest");
   const PermissionRequest = require("../models/PermissionRequest");
 
   if (["admin", "hr"].includes(req.user.role)) {
-    const [pendingLeaveCount, pendingPermissionCount] = await Promise.all([
+    const [pendingLeaveCount, pendingPermissionCount, pendingODCount] = await Promise.all([
       LeaveRequest.countDocuments({ status: "Pending" }),
-      PermissionRequest.countDocuments({ status: "Pending" })
+      PermissionRequest.countDocuments({ status: "Pending" }),
+      ODRequest.countDocuments({ status: "Pending" })
     ]);
     res.json({
+      odUpdateCount: 0,
+      pendingODCount,
       pendingLeaveCount,
       pendingPermissionCount,
       leaveUpdateCount: 0,
@@ -34,12 +38,15 @@ const getNotificationCounts = asyncHandler(async (req, res) => {
     return;
   }
 
-  const [leaveUpdateCount, permissionUpdateCount] = await Promise.all([
+  const [leaveUpdateCount, permissionUpdateCount, odUpdateCount] = await Promise.all([
     Notification.countDocuments({ user: req.user._id, type: "leave", isRead: false }),
-    Notification.countDocuments({ user: req.user._id, type: "permission", isRead: false })
+    Notification.countDocuments({ user: req.user._id, type: "permission", isRead: false }),
+    Notification.countDocuments({ user: req.user._id, type: "od", isRead: false })
   ]);
 
   res.json({
+    odUpdateCount,
+    pendingODCount: 0,
     pendingLeaveCount: 0,
     pendingPermissionCount: 0,
     leaveUpdateCount,

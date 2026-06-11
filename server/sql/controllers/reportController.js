@@ -23,8 +23,9 @@ const reportDefinitions = {
   },
   attendance: {
     title: "Location Attendance Report",
-    sql: `SELECT id, employee_id, date, check_in_time, check_out_time, check_in_location_status,
-                 check_in_distance_meters, check_out_location_status, check_out_distance_meters,
+    sql: `SELECT id, employee_id, date, check_in_time, check_out_time,
+                 check_in_latitude, check_in_longitude, check_in_accuracy, check_in_location_status,
+                 check_out_latitude, check_out_longitude, check_out_accuracy, check_out_location_status,
                  work_duration, status, created_at
           FROM attendance`,
     columns: [
@@ -33,10 +34,14 @@ const reportDefinitions = {
       "date",
       "check_in_time",
       "check_out_time",
+      "check_in_latitude",
+      "check_in_longitude",
+      "check_in_accuracy",
       "check_in_location_status",
-      "check_in_distance_meters",
+      "check_out_latitude",
+      "check_out_longitude",
+      "check_out_accuracy",
       "check_out_location_status",
-      "check_out_distance_meters",
       "work_duration",
       "status"
     ],

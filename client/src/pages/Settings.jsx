@@ -97,7 +97,7 @@ export default function Settings() {
             <div>
               <h2 className="text-base font-black text-slate-950 dark:text-blue-50">Office Location Settings</h2>
               <p className="mt-1 text-sm text-slate-500 dark:text-blue-200">
-                Employees can mark attendance only inside the active office radius.
+                Office coordinates are kept for reference. Attendance can be marked from any location.
               </p>
             </div>
           </div>

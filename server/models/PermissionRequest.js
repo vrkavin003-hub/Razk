@@ -29,6 +29,15 @@ const permissionRequestSchema = new mongoose.Schema(
       required: true,
       trim: true
     },
+    requestedHours: Number,
+    paidHours: Number,
+    unpaidHours: Number,
+    monthlyPaidPermissionUsed: Number,
+    monthlyPaidPermissionRemaining: Number,
+    limitExceeded: {
+      type: Boolean,
+      default: false
+    },
     status: {
       type: String,
       enum: ["Pending", "Approved", "Rejected"],

@@ -16,22 +16,31 @@ const attendanceSchema = new mongoose.Schema(
       required: true
     },
     checkIn: Date,
+    shiftName: {
+      type: String,
+      default: "Not marked",
+      trim: true
+    },
     checkInLatitude: Number,
     checkInLongitude: Number,
+    checkInAccuracy: Number,
     checkInLocationStatus: {
       type: String,
-      enum: ["Inside", "Outside", "Unknown"],
-      default: "Unknown"
+      enum: ["Captured", "Permission denied", "Location not available", "Inside", "Outside", "Unknown"],
+      default: "Location not available"
     },
+    checkInLocationCapturedAt: Date,
     checkInDistanceMeters: Number,
     checkOut: Date,
     checkOutLatitude: Number,
     checkOutLongitude: Number,
+    checkOutAccuracy: Number,
     checkOutLocationStatus: {
       type: String,
-      enum: ["Inside", "Outside", "Unknown"],
-      default: "Unknown"
+      enum: ["Captured", "Permission denied", "Location not available", "Inside", "Outside", "Unknown"],
+      default: "Location not available"
     },
+    checkOutLocationCapturedAt: Date,
     checkOutDistanceMeters: Number,
     workingHours: {
       type: Number,
@@ -39,7 +48,7 @@ const attendanceSchema = new mongoose.Schema(
     },
     status: {
       type: String,
-      enum: ["Present", "Absent", "Half Day", "Late"],
+      enum: ["Present", "Absent", "Half Day", "Late", "OD"],
       default: "Present"
     },
     locationNote: String,

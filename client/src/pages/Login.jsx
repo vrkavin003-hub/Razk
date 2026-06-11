@@ -46,9 +46,9 @@ export default function Login() {
   };
 
   return (
-    <main className="min-h-screen bg-[#f5f7fb] text-slate-950">
-      <div className="grid min-h-screen lg:grid-cols-[minmax(0,1fr)_520px]">
-        <section className="relative flex min-h-[54vh] flex-col justify-between overflow-hidden bg-[#101820] px-6 py-8 text-white lg:min-h-screen lg:px-12 lg:py-10">
+    <main className="min-h-mobile bg-[#f5f7fb] text-slate-950">
+      <div className="grid min-h-mobile lg:grid-cols-[minmax(0,1fr)_520px]">
+        <section className="mobile-safe-top relative flex min-h-[46vh] flex-col justify-between overflow-hidden bg-[#101820] px-5 py-6 text-white sm:px-6 sm:py-8 lg:min-h-screen lg:px-12 lg:py-10">
           <div className="absolute inset-0 opacity-[0.18]">
             <div className="h-full w-full bg-[linear-gradient(120deg,rgba(255,255,255,0.2)_1px,transparent_1px),linear-gradient(30deg,rgba(255,255,255,0.12)_1px,transparent_1px)] bg-[size:48px_48px]" />
           </div>
@@ -72,7 +72,7 @@ export default function Login() {
               <Factory className="h-4 w-4" aria-hidden="true" />
               HYA Tech Operations
             </div>
-            <h1 className="max-w-2xl text-4xl font-black leading-tight sm:text-5xl">HYA Tech HRMS</h1>
+            <h1 className="max-w-2xl text-3xl font-black leading-tight sm:text-5xl">HYA Tech HRMS</h1>
             <p className="mt-5 max-w-2xl text-base leading-7 text-slate-200">
               Attendance, approvals, employee records, and branded reports in one secure workspace.
             </p>
@@ -123,8 +123,8 @@ export default function Login() {
           </div>
         </section>
 
-        <section className="flex items-center justify-center px-6 py-10 lg:px-12">
-          <form className="w-full max-w-md rounded-lg border border-slate-200 bg-white p-6 shadow-panel" onSubmit={submit}>
+        <section className="mobile-safe-page flex items-center justify-center px-5 py-8 sm:px-6 lg:px-12">
+          <form className="w-full max-w-md rounded-lg border border-slate-200 bg-white p-5 shadow-panel sm:p-6" onSubmit={submit}>
             <div>
               <CompanyLogo className="mb-7" />
               <p className="text-xs font-black uppercase tracking-[0.18em] text-hya-600">Secure Login</p>

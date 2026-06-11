@@ -2,6 +2,7 @@ import {
   Activity,
   BarChart3,
   Bell,
+  Briefcase,
   CalendarCheck,
   ChevronRight,
   ClipboardList,
@@ -11,6 +12,7 @@ import {
   Menu,
   Settings,
   ShieldCheck,
+  UserCheck,
   UserPlus,
   Users,
   X
@@ -22,9 +24,10 @@ import CompanyLogo from "../components/CompanyLogo";
 import NotificationBell from "../components/NotificationBell";
 import ThemeToggle from "../components/ThemeToggle";
 import TopBarClock from "../components/TopBarClock";
+import UserAvatar from "../components/UserAvatar";
 import { useAuth } from "../context/AuthContext";
 import api from "../services/api";
-import { initials, roleMatches } from "../utils/formatters";
+import { roleMatches } from "../utils/formatters";
 
 const navItems = [
   { label: "Dashboard", path: "/admin", icon: LayoutDashboard, roles: ["admin"], section: "Overview" },
@@ -34,8 +37,10 @@ const navItems = [
   { label: "Add Employee", path: "/employees/new", icon: UserPlus, roles: ["admin", "hr"], section: "People" },
   { label: "Attendance", path: "/attendance", icon: CalendarCheck, roles: ["admin", "hr", "employee"], section: "Operations" },
   { label: "Reports", path: "/attendance/reports", icon: BarChart3, roles: ["admin", "hr"], section: "Operations" },
+  { label: "Customer / Visitor Visits", path: "/visitors", icon: UserCheck, roles: ["admin", "hr"], section: "Operations" },
   { label: "Leave", path: "/leave", icon: FileText, roles: ["admin", "hr", "employee"], section: "Requests" },
   { label: "Permission", path: "/permission", icon: ClipboardList, roles: ["admin", "hr", "employee"], section: "Requests" },
+  { label: "OD Requests", path: "/od", icon: Briefcase, roles: ["admin", "hr", "employee"], section: "Requests" },
   { label: "Announcements", path: "/announcements", icon: Bell, roles: ["admin", "hr", "employee"], section: "Comms" },
   { label: "Profile", path: "/profile", icon: ShieldCheck, roles: ["admin", "hr", "employee"], section: "Account" },
   { label: "Settings", path: "/settings", icon: Settings, roles: ["admin", "hr", "employee"], section: "Account" }
@@ -58,6 +63,8 @@ export default function AppLayout() {
   const [open, setOpen] = useState(false);
   const [theme, setTheme] = useState(initialTheme);
   const [counts, setCounts] = useState({
+    odUpdateCount: 0,
+    pendingODCount: 0,
     pendingLeaveCount: 0,
     pendingPermissionCount: 0,
     leaveUpdateCount: 0,
@@ -98,6 +105,8 @@ export default function AppLayout() {
       } catch {
         if (isMounted) {
           setCounts({
+            odUpdateCount: 0,
+            pendingODCount: 0,
             pendingLeaveCount: 0,
             pendingPermissionCount: 0,
             leaveUpdateCount: 0,
@@ -123,6 +132,9 @@ export default function AppLayout() {
       return roleMatches(user?.role, ["admin", "hr"])
         ? counts.pendingPermissionCount
         : counts.permissionUpdateCount;
+    }
+    if (path === "/od") {
+      return roleMatches(user?.role, ["admin", "hr"]) ? counts.pendingODCount : counts.odUpdateCount;
     }
     return 0;
   };
@@ -185,9 +197,7 @@ export default function AppLayout() {
       <div className="border-t border-slate-100 p-4 dark:border-[#203e6f]">
         <div className="mb-4 rounded-lg border border-slate-200 bg-slate-50 p-3 dark:border-[#24456f] dark:bg-[#0c1f3d]">
           <div className="mb-3 flex items-center gap-3">
-          <div className="grid h-10 w-10 place-items-center rounded-lg bg-slate-950 text-sm font-black text-white dark:bg-blue-500">
-            {initials(user?.name)}
-          </div>
+          <UserAvatar name={user?.name} photo={user?.profilePhoto} />
             <div className="min-w-0">
               <p className="truncate text-sm font-black text-slate-900 dark:text-blue-50">{user?.name}</p>
               <p className="truncate text-xs font-semibold text-slate-500 dark:text-blue-200">
@@ -214,7 +224,7 @@ export default function AppLayout() {
 
   return (
     <div
-      className={`theme-${theme} min-h-screen bg-[#f6f8fb] text-slate-900 dark:bg-hya-950 dark:text-blue-50`}
+      className={`theme-${theme} min-h-mobile bg-[#f6f8fb] text-slate-900 dark:bg-hya-950 dark:text-blue-50`}
       data-theme={theme}
     >
       <div className="hidden lg:fixed lg:inset-y-0 lg:flex">{sidebar}</div>
@@ -229,7 +239,7 @@ export default function AppLayout() {
         </div>
       ) : null}
       <div className="lg:pl-72">
-        <header className="sticky top-0 z-20 flex h-[72px] items-center justify-between border-b border-slate-200 bg-white/90 px-4 backdrop-blur-xl lg:px-8 dark:border-[#203e6f] dark:bg-[#09192e]/95">
+        <header className="mobile-safe-top sticky top-0 z-20 flex min-h-[72px] items-center justify-between border-b border-slate-200 bg-white/90 px-4 py-3 backdrop-blur-xl lg:px-8 dark:border-[#203e6f] dark:bg-[#09192e]/95">
           <div className="flex min-w-0 items-center gap-3">
             <button
               className="inline-grid h-10 w-10 place-items-center rounded-lg border border-slate-200 bg-white text-slate-700 shadow-sm shadow-slate-900/5 lg:hidden dark:border-[#24456f] dark:bg-[#0c1f3d] dark:text-blue-100"
@@ -255,12 +265,10 @@ export default function AppLayout() {
               <p className="text-sm font-bold text-slate-900 dark:text-blue-50">{user?.name}</p>
               <p className="text-xs text-slate-500 dark:text-blue-200">{user?.department || "HYA Tech"}</p>
             </div>
-            <div className="grid h-10 w-10 place-items-center rounded-lg bg-hya-600 text-sm font-black text-white shadow-sm shadow-hya-600/20">
-              {initials(user?.name)}
-            </div>
+            <UserAvatar className="shadow-sm shadow-hya-600/20" name={user?.name} photo={user?.profilePhoto} />
           </div>
         </header>
-        <main className="mx-auto w-full max-w-[1500px] px-4 py-6 lg:px-8 lg:py-8">
+        <main className="mobile-safe-page mx-auto w-full max-w-[1500px] px-4 py-6 lg:px-8 lg:py-8">
           <Outlet />
         </main>
       </div>

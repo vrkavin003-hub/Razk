@@ -1,6 +1,7 @@
 import axios from "axios";
+import { API_BASE_URL, apiConfigurationWarning } from "../config/api";
 
-export const API_BASE_URL = import.meta.env.VITE_API_URL || "http://localhost:5000/api";
+export { API_BASE_URL };
 
 const api = axios.create({
   baseURL: API_BASE_URL,
@@ -8,6 +9,10 @@ const api = axios.create({
 });
 
 api.interceptors.request.use((config) => {
+  if (apiConfigurationWarning) {
+    return Promise.reject(new Error(apiConfigurationWarning));
+  }
+
   const token = localStorage.getItem("hya_token");
   if (token) {
     config.headers.Authorization = `Bearer ${token}`;
@@ -18,8 +23,21 @@ api.interceptors.request.use((config) => {
 api.interceptors.response.use(
   (response) => response,
   (error) => {
-    const message = error.response?.data?.message || error.message || "Request failed";
-    return Promise.reject(new Error(message));
+    if (error.response?.status === 401) {
+      localStorage.removeItem("hya_token");
+      localStorage.removeItem("hya_user");
+      window.dispatchEvent(new Event("hya:auth-expired"));
+    }
+
+    const serverMessage = error.response?.data?.message;
+    const validationMessage = error.response?.data?.errors?.[0]?.message;
+    const fallbackMessage = error.code === "ECONNABORTED"
+      ? "The server took too long to respond. Please try again."
+      : error.request
+        ? `Unable to reach the HYA Tech API at ${API_BASE_URL}. ${apiConfigurationWarning || "Check the backend URL and network connection."}`
+        : error.message;
+
+    return Promise.reject(new Error(serverMessage || validationMessage || fallbackMessage || "Request failed"));
   }
 );
 

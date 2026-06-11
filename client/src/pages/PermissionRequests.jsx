@@ -8,6 +8,7 @@ import EmptyState from "../components/EmptyState";
 import Loading from "../components/Loading";
 import PageHeader from "../components/PageHeader";
 import RequestStatusBadge from "../components/RequestStatusBadge";
+import UserAvatar from "../components/UserAvatar";
 import { useAuth } from "../context/AuthContext";
 import api from "../services/api";
 import { formatDate } from "../utils/formatters";
@@ -25,6 +26,8 @@ export default function PermissionRequests() {
   const isManager = ["admin", "hr"].includes(user?.role);
   const [permissions, setPermissions] = useState(null);
   const [form, setForm] = useState(defaultForm);
+  const [balance, setBalance] = useState(null);
+  const [balances, setBalances] = useState({});
   const [decision, setDecision] = useState(null);
   const [deciding, setDeciding] = useState(false);
   const [saving, setSaving] = useState(false);
@@ -33,6 +36,8 @@ export default function PermissionRequests() {
     const endpoint = isManager ? "/permission/all" : "/permission/my-requests";
     const { data } = await api.get(endpoint);
     setPermissions(data.permissions);
+    setBalance(data.balance || null);
+    setBalances(data.balances || {});
   };
 
   useEffect(() => {
@@ -43,9 +48,10 @@ export default function PermissionRequests() {
     event.preventDefault();
     setSaving(true);
     try {
-      await api.post("/permission/apply", form);
+      const { data } = await api.post("/permission/apply", form);
       setForm(defaultForm);
       toast.success("Permission request submitted");
+      if (data.warning) toast.error(data.warning);
       await load();
     } catch (error) {
       toast.error(error.message);
@@ -59,8 +65,9 @@ export default function PermissionRequests() {
     const { action, permission } = decision;
     setDeciding(true);
     try {
-      await api.put(`/permission/${permission._id}/${action}`, { adminRemarks: remark });
+      const { data } = await api.put(`/permission/${permission._id}/${action}`, { adminRemarks: remark });
       toast.success(`Permission ${action === "approve" ? "approved" : "rejected"}`);
+      if (data.warning) toast.error(data.warning);
       setDecision(null);
       await load();
     } catch (error) {
@@ -79,6 +86,21 @@ export default function PermissionRequests() {
         description={isManager ? "Review late coming, early leaving, personal, and official work permissions." : "Submit permission and track status."}
       />
       {!isManager ? (
+        <>
+        <section className="mb-6 grid gap-4 md:grid-cols-3">
+          <div className="surface-muted p-4">
+            <p className="text-xs font-black uppercase text-slate-500 dark:text-blue-200">Paid Permission Limit</p>
+            <p className="mt-2 text-2xl font-black text-slate-950 dark:text-blue-50">{balance?.limit ?? 2} hours</p>
+          </div>
+          <div className="surface-muted p-4">
+            <p className="text-xs font-black uppercase text-slate-500 dark:text-blue-200">Used This Month</p>
+            <p className="mt-2 text-2xl font-black text-amber-600 dark:text-amber-200">{balance?.used ?? 0}</p>
+          </div>
+          <div className="surface-muted p-4">
+            <p className="text-xs font-black uppercase text-slate-500 dark:text-blue-200">Remaining</p>
+            <p className="mt-2 text-2xl font-black text-emerald-600 dark:text-emerald-200">{balance?.remaining ?? 2}</p>
+          </div>
+        </section>
         <form className="mb-6 panel p-5" onSubmit={submit}>
           <div className="grid gap-4 md:grid-cols-2">
             <label className="space-y-1">
@@ -114,6 +136,7 @@ export default function PermissionRequests() {
             Apply Permission
           </Button>
         </form>
+        </>
       ) : null}
       <section className="panel p-5">
         <div className="overflow-x-auto">
@@ -124,6 +147,7 @@ export default function PermissionRequests() {
                 <th className="px-4 py-3">Type</th>
                 <th className="px-4 py-3">Date</th>
                 <th className="px-4 py-3">Time</th>
+                <th className="px-4 py-3">Paid / Unpaid</th>
                 <th className="px-4 py-3">Requested</th>
                 <th className="px-4 py-3">Reason</th>
                 <th className="px-4 py-3">Status</th>
@@ -136,13 +160,30 @@ export default function PermissionRequests() {
               {permissions.map((permission) => (
                 <tr key={permission._id}>
                   <td className="table-cell">
-                    <p className="font-semibold text-slate-950">{permission.employee?.name || user?.name || "-"}</p>
-                    <p className="text-xs text-slate-500">{permission.employee?.employeeId || user?.employeeId || ""}</p>
-                    <p className="text-xs text-slate-500">{permission.employee?.department || user?.department || ""}</p>
+                    <div className="flex items-center gap-3">
+                      <UserAvatar name={permission.employee?.name || user?.name} photo={permission.employee?.profilePhoto || user?.profilePhoto} size="sm" />
+                      <div>
+                        <p className="font-semibold text-slate-950">{permission.employee?.name || user?.name || "-"}</p>
+                        <p className="text-xs text-slate-500">{permission.employee?.employeeId || user?.employeeId || ""}</p>
+                        <p className="text-xs text-slate-500">{permission.employee?.department || user?.department || ""}</p>
+                        {isManager && balances[String(permission.employee?._id || "")] ? (
+                          <p className="text-xs font-bold text-emerald-700">
+                            Balance: {balances[String(permission.employee?._id || "")].remaining} hrs
+                          </p>
+                        ) : null}
+                      </div>
+                    </div>
                   </td>
                   <td className="table-cell">{permission.permissionType}</td>
                   <td className="table-cell">{formatDate(permission.date)}</td>
                   <td className="table-cell">{permission.fromTime} to {permission.toTime}</td>
+                  <td className="table-cell">
+                    <p className="font-semibold">{permission.paidHours ?? permission.requestedHours ?? "-"} paid</p>
+                    <p className="text-xs text-slate-500">{permission.unpaidHours || 0} unpaid</p>
+                    {permission.limitExceeded ? (
+                      <p className="text-xs font-bold text-amber-700">Limit exceeded</p>
+                    ) : null}
+                  </td>
                   <td className="table-cell">
                     <DateTimeDisplay value={permission.createdAt} />
                   </td>

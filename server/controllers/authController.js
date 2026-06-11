@@ -3,8 +3,17 @@ const jwt = require("jsonwebtoken");
 const asyncHandler = require("../utils/asyncHandler");
 const User = require("../models/User");
 
+const getJwtSecret = () => {
+  if (!process.env.JWT_SECRET) {
+    const error = new Error("JWT_SECRET is missing. Set it in the backend environment before using authentication.");
+    error.statusCode = 500;
+    throw error;
+  }
+  return process.env.JWT_SECRET;
+};
+
 const generateToken = (id) =>
-  jwt.sign({ id }, process.env.JWT_SECRET, {
+  jwt.sign({ id }, getJwtSecret(), {
     expiresIn: "7d"
   });
 
@@ -16,6 +25,7 @@ const sanitizeUser = (user) => ({
   employeeId: user.employeeId,
   department: user.department,
   designation: user.designation,
+  assignedShift: user.assignedShift,
   phone: user.phone,
   joiningDate: user.joiningDate,
   address: user.address,
@@ -64,6 +74,7 @@ const login = asyncHandler(async (req, res) => {
 const forgotPassword = asyncHandler(async (req, res) => {
   const { email } = req.body;
   const user = await User.findOne({ email: String(email || "").toLowerCase() });
+  const clientOrigin = process.env.CLIENT_ORIGIN || process.env.CLIENT_URL || "http://localhost:5174";
 
   if (!user) {
     res.json({ message: "If that email exists, a reset token has been generated." });
@@ -78,7 +89,7 @@ const forgotPassword = asyncHandler(async (req, res) => {
   res.json({
     message: "Password reset token generated.",
     resetToken,
-    resetUrl: `${process.env.CLIENT_URL || "http://localhost:5173"}/reset-password?token=${resetToken}`
+    resetUrl: `${clientOrigin}/reset-password?token=${resetToken}`
   });
 });
 

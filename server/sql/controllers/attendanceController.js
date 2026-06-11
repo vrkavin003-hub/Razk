@@ -3,10 +3,8 @@ const HttpError = require("../utils/httpError");
 const { pagedResponse, pagination } = require("../utils/pagination");
 const toCsv = require("../../utils/csv");
 const { getWorkingHours, isLateCheckIn, toDateKey } = require("../../utils/dates");
-const { buildLocationDecision, validateCoordinates } = require("../../utils/geo");
-const { activeOffice } = require("./officeLocationController");
-
-const outsideLocationMessage = "You are outside the allowed company location. Attendance cannot be marked.";
+const { normalizeAttendanceLocation } = require("../../utils/geo");
+const { getShiftFromCheckIn } = require("../../utils/shifts");
 
 const mapAttendanceRow = (row) =>
   row
@@ -16,14 +14,19 @@ const mapAttendanceRow = (row) =>
         employeeId: row.employee_id,
         date: row.date,
         checkIn: row.check_in_time,
-        checkInLatitude: Number(row.check_in_latitude),
-        checkInLongitude: Number(row.check_in_longitude),
+        shiftName: row.shift_name || "Not marked",
+        checkInLatitude: row.check_in_latitude === null ? null : Number(row.check_in_latitude),
+        checkInLongitude: row.check_in_longitude === null ? null : Number(row.check_in_longitude),
+        checkInAccuracy: row.check_in_accuracy === null ? null : Number(row.check_in_accuracy),
         checkInLocationStatus: row.check_in_location_status,
+        checkInLocationCapturedAt: row.check_in_location_captured_at,
         checkInDistanceMeters: row.check_in_distance_meters,
         checkOut: row.check_out_time,
         checkOutLatitude: row.check_out_latitude === null ? null : Number(row.check_out_latitude),
         checkOutLongitude: row.check_out_longitude === null ? null : Number(row.check_out_longitude),
+        checkOutAccuracy: row.check_out_accuracy === null ? null : Number(row.check_out_accuracy),
         checkOutLocationStatus: row.check_out_location_status,
+        checkOutLocationCapturedAt: row.check_out_location_captured_at,
         checkOutDistanceMeters: row.check_out_distance_meters,
         workingHours: Number(row.work_duration || 0),
         status: row.status,
@@ -31,17 +34,6 @@ const mapAttendanceRow = (row) =>
         updatedAt: row.updated_at
       }
     : null;
-
-const validateAttendanceLocation = async (body) => {
-  const coordinates = validateCoordinates(body);
-  const office = await activeOffice();
-  if (!office) throw new HttpError("No active office location is configured. Please contact admin.", 400);
-  const decision = buildLocationDecision({ ...coordinates, office });
-  if (!decision.inside) {
-    throw new HttpError(outsideLocationMessage, 403, decision);
-  }
-  return { ...coordinates, decision };
-};
 
 const currentEmployeeId = (req) => String(req.body.employee_id || req.user.employeeId || req.user.id);
 
@@ -55,27 +47,31 @@ const checkIn = async (req, res, next) => {
     });
     if (existing.length) throw new HttpError("You have already checked in today", 409);
 
-    const location = await validateAttendanceLocation(req.body);
     const now = new Date();
+    const location = normalizeAttendanceLocation(req.body, now);
+    const shiftName = getShiftFromCheckIn(now, req.user.assignedShift || req.user.shiftName);
     const status = isLateCheckIn(now) ? "Late" : "Present";
     const result = await query(
       `INSERT INTO attendance
-        (employee_id, check_in_time, check_in_latitude, check_in_longitude, check_in_location_status,
-         check_in_distance_meters, date, status)
+        (employee_id, check_in_time, shift_name, check_in_latitude, check_in_longitude, check_in_location_status,
+         check_in_accuracy, check_in_location_captured_at, check_in_distance_meters, date, status)
        VALUES
-        (:employeeId, :checkInTime, :latitude, :longitude, :locationStatus, :distanceMeters, :date, :status)`,
+        (:employeeId, :checkInTime, :shiftName, :latitude, :longitude, :locationStatus,
+         :accuracy, :capturedAt, NULL, :date, :status)`,
       {
+        accuracy: location.accuracy,
+        capturedAt: location.capturedAt,
         checkInTime: now,
         date,
-        distanceMeters: location.decision.distanceMeters,
         employeeId,
         latitude: location.latitude,
-        locationStatus: location.decision.status,
+        locationStatus: location.locationStatus,
         longitude: location.longitude,
+        shiftName,
         status
       }
     );
-    res.status(201).json({ attendanceId: result.insertId, location: location.decision, message: "Checked in successfully" });
+    res.status(201).json({ attendanceId: result.insertId, location, message: "Check-in marked successfully." });
   } catch (error) {
     next(error);
   }
@@ -93,8 +89,8 @@ const checkOut = async (req, res, next) => {
     if (!attendance) throw new HttpError("You must check in before checking out", 400);
     if (attendance.check_out_time) throw new HttpError("You have already checked out today", 409);
 
-    const location = await validateAttendanceLocation(req.body);
     const now = new Date();
+    const location = normalizeAttendanceLocation(req.body, now);
     const workDuration = getWorkingHours(attendance.check_in_time, now);
     const status = workDuration < 4 ? "Half Day" : attendance.status;
     await query(
@@ -103,22 +99,25 @@ const checkOut = async (req, res, next) => {
            check_out_latitude = :latitude,
            check_out_longitude = :longitude,
            check_out_location_status = :locationStatus,
-           check_out_distance_meters = :distanceMeters,
+           check_out_accuracy = :accuracy,
+           check_out_location_captured_at = :capturedAt,
+           check_out_distance_meters = NULL,
            work_duration = :workDuration,
            status = :status
        WHERE id = :id`,
       {
+        accuracy: location.accuracy,
+        capturedAt: location.capturedAt,
         checkOutTime: now,
-        distanceMeters: location.decision.distanceMeters,
         id: attendance.id,
         latitude: location.latitude,
-        locationStatus: location.decision.status,
+        locationStatus: location.locationStatus,
         longitude: location.longitude,
         status,
         workDuration
       }
     );
-    res.json({ location: location.decision, message: "Checked out successfully" });
+    res.json({ location, message: "Check-out marked successfully." });
   } catch (error) {
     next(error);
   }
@@ -184,10 +183,15 @@ const exportCsv = async (req, res, next) => {
       "employee_id",
       "check_in_time",
       "check_out_time",
+      "shift_name",
+      "check_in_latitude",
+      "check_in_longitude",
+      "check_in_accuracy",
       "check_in_location_status",
-      "check_in_distance_meters",
+      "check_out_latitude",
+      "check_out_longitude",
+      "check_out_accuracy",
       "check_out_location_status",
-      "check_out_distance_meters",
       "work_duration",
       "status"
     ];

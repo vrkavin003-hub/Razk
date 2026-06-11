@@ -26,6 +26,15 @@ const leaveRequestSchema = new mongoose.Schema(
       trim: true
     },
     attachment: String,
+    requestedDays: Number,
+    paidDays: Number,
+    unpaidDays: Number,
+    yearlyPaidLeaveUsed: Number,
+    yearlyPaidLeaveRemaining: Number,
+    limitExceeded: {
+      type: Boolean,
+      default: false
+    },
     status: {
       type: String,
       enum: ["Pending", "Approved", "Rejected"],

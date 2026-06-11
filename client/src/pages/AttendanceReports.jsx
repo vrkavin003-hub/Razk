@@ -10,6 +10,7 @@ import StatCard from "../components/StatCard";
 import StatusBadge from "../components/StatusBadge";
 import api from "../services/api";
 import { formatDate, formatTime } from "../utils/formatters";
+import { attendanceShift } from "../utils/shifts";
 
 const today = new Date();
 const currentMonth = String(today.getMonth() + 1).padStart(2, "0");
@@ -293,6 +294,9 @@ function ReportTable({ report }) {
               <th className="px-4 py-3">Day</th>
               <th className="px-4 py-3">Check-in</th>
               <th className="px-4 py-3">Check-out</th>
+              <th className="px-4 py-3">Shift</th>
+              <th className="px-4 py-3">Check-in Location</th>
+              <th className="px-4 py-3">Check-out Location</th>
               <th className="px-4 py-3">Hours</th>
               <th className="px-4 py-3">Status</th>
               <th className="px-4 py-3">Remarks</th>
@@ -305,6 +309,21 @@ function ReportTable({ report }) {
                 <td className="table-cell">{record.day}</td>
                 <td className="table-cell">{formatTime(record.checkIn)}</td>
                 <td className="table-cell">{formatTime(record.checkOut)}</td>
+                <td className="table-cell font-semibold">{attendanceShift(record)}</td>
+                <td className="table-cell">
+                  <p className="font-semibold">{record.checkInLocationStatus || "Location not available"}</p>
+                  <p className="text-xs text-slate-500">
+                    {record.checkInLatitude || record.checkInLatitude === 0 ? record.checkInLatitude : "-"},{" "}
+                    {record.checkInLongitude || record.checkInLongitude === 0 ? record.checkInLongitude : "-"}
+                  </p>
+                </td>
+                <td className="table-cell">
+                  <p className="font-semibold">{record.checkOutLocationStatus || "Location not available"}</p>
+                  <p className="text-xs text-slate-500">
+                    {record.checkOutLatitude || record.checkOutLatitude === 0 ? record.checkOutLatitude : "-"},{" "}
+                    {record.checkOutLongitude || record.checkOutLongitude === 0 ? record.checkOutLongitude : "-"}
+                  </p>
+                </td>
                 <td className="table-cell">{record.workingHours}</td>
                 <td className="table-cell">
                   <StatusBadge status={record.status} />

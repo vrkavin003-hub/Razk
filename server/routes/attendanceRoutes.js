@@ -16,6 +16,7 @@ router.use(protect);
 router.post("/check-in", authorize("employee", "hr", "admin"), checkIn);
 router.post("/check-out", authorize("employee", "hr", "admin"), checkOut);
 router.get("/today", getTodayAttendance);
+router.get("/my-attendance", getMyHistory);
 router.get("/my-history", getMyHistory);
 router.get("/all", authorize("admin", "hr"), getAllAttendance);
 router.get("/report", authorize("admin", "hr"), getReport);

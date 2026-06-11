@@ -11,6 +11,7 @@
     margin: 0;
     min-width: 320px;
     min-height: 100vh;
+    min-height: 100dvh;
     background:
       linear-gradient(180deg, #f7f9fc 0%, #eef3f7 100%);
     color: #142033;
@@ -29,6 +30,7 @@
   select,
   textarea {
     font: inherit;
+    font-size: 16px;
   }
 
   button,
@@ -338,6 +340,26 @@
   .thin-scrollbar {
     scrollbar-color: #cbd5e1 transparent;
     scrollbar-width: thin;
+  }
+
+  .min-h-mobile {
+    min-height: 100vh;
+    min-height: 100dvh;
+  }
+
+  .mobile-safe-page {
+    padding-bottom: max(1.5rem, env(safe-area-inset-bottom));
+  }
+
+  @media (max-width: 1023px) {
+    .mobile-safe-page {
+      padding-left: max(1rem, env(safe-area-inset-left));
+      padding-right: max(1rem, env(safe-area-inset-right));
+    }
+
+    .mobile-safe-top {
+      padding-top: max(0.75rem, env(safe-area-inset-top));
+    }
   }
 }
 

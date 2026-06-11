@@ -1,34 +1,45 @@
-export const calculateDistanceMeters = (fromLatitude, fromLongitude, toLatitude, toLongitude) => {
-  const earthRadiusMeters = 6371000;
-  const toRadians = (degrees) => (degrees * Math.PI) / 180;
-  const deltaLatitude = toRadians(toLatitude - fromLatitude);
-  const deltaLongitude = toRadians(toLongitude - fromLongitude);
-  const fromLatRadians = toRadians(fromLatitude);
-  const toLatRadians = toRadians(toLatitude);
+import { Capacitor } from "@capacitor/core";
+import { Geolocation } from "@capacitor/geolocation";
 
-  const haversine =
-    Math.sin(deltaLatitude / 2) ** 2 +
-    Math.cos(fromLatRadians) * Math.cos(toLatRadians) * Math.sin(deltaLongitude / 2) ** 2;
+const locationPermissionMessage = "Location permission was not allowed.";
 
-  return Math.round(earthRadiusMeters * 2 * Math.atan2(Math.sqrt(haversine), Math.sqrt(1 - haversine)));
+const assertValidCoordinates = ({ latitude, longitude, accuracy }) => {
+  const normalized = {
+    accuracy: Math.round(Number(accuracy) || 0),
+    latitude: Number(latitude),
+    longitude: Number(longitude)
+  };
+
+  if (!Number.isFinite(normalized.latitude) || !Number.isFinite(normalized.longitude)) {
+    throw new Error("Location could not be captured.");
+  }
+
+  return normalized;
+};
+
+const browserLocationError = (error) => {
+  if (error?.code === 1) return locationPermissionMessage;
+  if (error?.code === 2) return "Location is turned off or unavailable.";
+  if (error?.code === 3) return "Location request timed out.";
+  return "Location could not be captured.";
 };
 
 export const getBrowserLocation = () =>
   new Promise((resolve, reject) => {
     if (!navigator.geolocation) {
-      reject(new Error("GPS location is not supported by this browser."));
+      reject(new Error("Location could not be captured on this device."));
       return;
     }
 
     navigator.geolocation.getCurrentPosition(
       (position) => {
-        resolve({
-          accuracy: Math.round(position.coords.accuracy || 0),
+        resolve(assertValidCoordinates({
+          accuracy: position.coords.accuracy,
           latitude: position.coords.latitude,
           longitude: position.coords.longitude
-        });
+        }));
       },
-      () => reject(new Error("Location permission is required to mark attendance.")),
+      (error) => reject(new Error(browserLocationError(error))),
       {
         enableHighAccuracy: true,
         maximumAge: 0,
@@ -37,20 +48,75 @@ export const getBrowserLocation = () =>
     );
   });
 
-export const evaluateOfficeLocation = (coordinates, office) => {
-  if (!coordinates || !office) return null;
-  const distanceMeters = calculateDistanceMeters(
-    coordinates.latitude,
-    coordinates.longitude,
-    Number(office.latitude),
-    Number(office.longitude)
-  );
-  const radiusMeters = Number(office.radiusMeters ?? office.radius_meters);
+const ensureCapacitorLocationPermission = async () => {
+  const permission = await Geolocation.checkPermissions();
+  if (permission.location === "granted") return;
+
+  if (permission.location === "denied") {
+    throw new Error(locationPermissionMessage);
+  }
+
+  const requested = await Geolocation.requestPermissions();
+  if (requested.location !== "granted") {
+    throw new Error(locationPermissionMessage);
+  }
+};
+
+export const getCurrentLocation = async () => {
+  if (!Capacitor.isNativePlatform()) {
+    return getBrowserLocation();
+  }
+
+  try {
+    await ensureCapacitorLocationPermission();
+    const position = await Geolocation.getCurrentPosition({
+      enableHighAccuracy: true,
+      maximumAge: 0,
+      timeout: 15000
+    });
+
+    return assertValidCoordinates({
+      accuracy: position.coords.accuracy,
+      latitude: position.coords.latitude,
+      longitude: position.coords.longitude
+    });
+  } catch (error) {
+    const message = String(error?.message || "");
+    if (/denied|permission/i.test(message)) throw new Error(locationPermissionMessage);
+    if (/location|disabled|unavailable/i.test(message)) {
+      throw new Error("Location is turned off or unavailable.");
+    }
+    throw new Error(message || "Location could not be captured.");
+  }
+};
+
+export const attendanceLocationFromError = (error) => {
+  const message = String(error?.message || "");
+  const permissionDenied = /denied|permission|allow precise location/i.test(message);
 
   return {
-    distanceMeters,
-    inside: distanceMeters <= radiusMeters,
-    radiusMeters,
-    status: distanceMeters <= radiusMeters ? "Inside" : "Outside"
+    accuracy: null,
+    latitude: null,
+    locationError: message || "Location could not be captured.",
+    locationStatus: permissionDenied ? "Permission denied" : "Location not available",
+    longitude: null
   };
+};
+
+export const getAttendanceLocationPayload = async () => {
+  try {
+    const coordinates = await getCurrentLocation();
+    return {
+      ...coordinates,
+      locationError: "",
+      locationStatus: "Captured"
+    };
+  } catch (error) {
+    return attendanceLocationFromError(error);
+  }
+};
+
+export const googleMapsUrl = (latitude, longitude) => {
+  if (latitude === null || latitude === undefined || longitude === null || longitude === undefined) return "";
+  return `https://www.google.com/maps?q=${latitude},${longitude}`;
 };

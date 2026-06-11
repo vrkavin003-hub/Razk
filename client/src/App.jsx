@@ -15,9 +15,11 @@ import HRDashboard from "./pages/HRDashboard";
 import LeaveRequests from "./pages/LeaveRequests";
 import Login from "./pages/Login";
 import NotFound from "./pages/NotFound";
+import ODRequests from "./pages/ODRequests";
 import PermissionRequests from "./pages/PermissionRequests";
 import ResetPassword from "./pages/ResetPassword";
 import Settings from "./pages/Settings";
+import VisitorVisits from "./pages/VisitorVisits";
 
 export default function App() {
   return (
@@ -47,6 +49,10 @@ export default function App() {
             <Route path="/attendance" element={<AttendancePage />} />
             <Route path="/leave" element={<LeaveRequests />} />
             <Route path="/permission" element={<PermissionRequests />} />
+            <Route path="/od" element={<ODRequests />} />
+            <Route element={<ProtectedRoute roles={["admin", "hr"]} />}>
+              <Route path="/visitors" element={<VisitorVisits />} />
+            </Route>
             <Route path="/announcements" element={<Announcements />} />
             <Route path="/profile" element={<EmployeeProfile />} />
             <Route path="/settings" element={<Settings />} />
