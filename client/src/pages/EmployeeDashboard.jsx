@@ -23,7 +23,7 @@ const defaultLeave = {
   reason: ""
 };
 
-export default function EmployeeDashboard() {
+export default function EmployeeDashboard({ title = "Employee Dashboard" }) {
   const { user } = useAuth();
   const [dashboard, setDashboard] = useState(null);
   const [leaveForm, setLeaveForm] = useState(defaultLeave);
@@ -97,7 +97,7 @@ export default function EmployeeDashboard() {
 
   return (
     <>
-      <PageHeader title="Employee Dashboard" description="Today attendance, leave balance, requests, and announcements." />
+      <PageHeader title={title} description="Today attendance, leave balance, requests, and announcements." />
       <section className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
         <StatCard label="Today Status" value={dashboard.todayStatus} icon={CalendarCheck} tone="blue" />
         <StatCard label="Check In" value={formatTime(dashboard.attendance?.checkIn)} icon={LogIn} tone="green" />

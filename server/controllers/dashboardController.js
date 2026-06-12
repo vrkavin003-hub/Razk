@@ -30,7 +30,7 @@ const requestStatusChart = async () => {
 
 const buildOrgDashboard = async () => {
   const today = toDateKey();
-  const activeEmployees = await User.find({ isActive: true, role: { $in: ["employee", "hr"] } });
+  const activeEmployees = await User.find({ isActive: true, role: { $in: ["employee", "hr", "dri"] } });
   const totalEmployees = activeEmployees.length;
   const todayAttendance = await Attendance.find({ date: today }).populate(
     "employee",

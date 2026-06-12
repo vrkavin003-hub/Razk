@@ -28,9 +28,9 @@ const getEmployees = asyncHandler(async (req, res) => {
 });
 
 const getEmployeeById = asyncHandler(async (req, res) => {
-  if (req.user.role === "employee" && String(req.user._id) !== req.params.id) {
+  if (!["admin", "hr"].includes(req.user.role) && String(req.user._id) !== req.params.id) {
     res.status(403);
-    throw new Error("Employees can only view their own profile");
+    throw new Error("Users can only view their own profile");
   }
 
   const employee = await User.findById(req.params.id);
@@ -66,10 +66,10 @@ const updateEmployee = asyncHandler(async (req, res) => {
     throw new Error("Employee not found");
   }
 
-  if (req.user.role === "employee") {
+  if (!["admin", "hr"].includes(req.user.role)) {
     if (String(req.user._id) !== String(employee._id)) {
       res.status(403);
-      throw new Error("Employees can only update their own profile");
+      throw new Error("Users can only update their own profile");
     }
 
     allowedEmployeeSelfFields.forEach((field) => {

@@ -24,7 +24,7 @@ export default function Login() {
   const navigate = useNavigate();
   const location = useLocation();
   const [showPassword, setShowPassword] = useState(false);
-  const [form, setForm] = useState({ email: "admin@hyatech.com", password: "Admin@12345" });
+  const [form, setForm] = useState({ email: "", password: "" });
   const [loading, setLoading] = useState(false);
 
   useEffect(() => {
@@ -124,22 +124,26 @@ export default function Login() {
         </section>
 
         <section className="mobile-safe-page flex items-center justify-center px-5 py-8 sm:px-6 lg:px-12">
-          <form className="w-full max-w-md rounded-lg border border-slate-200 bg-white p-5 shadow-panel sm:p-6" onSubmit={submit}>
+          <form
+            autoComplete="off"
+            className="w-full max-w-md rounded-lg border border-slate-200 bg-white p-5 shadow-panel sm:p-6"
+            onSubmit={submit}
+          >
             <div>
               <CompanyLogo className="mb-7" />
               <p className="text-xs font-black uppercase tracking-[0.18em] text-hya-600">Secure Login</p>
               <h2 className="mt-2 text-3xl font-black text-slate-950">Welcome back</h2>
-              <p className="mt-2 text-sm leading-6 text-slate-500">Sign in to continue to your HYA Tech workspace.</p>
+              <p className="mt-2 text-sm leading-6 text-slate-500">Sign in with your HYA Tech email or login ID.</p>
             </div>
             <div className="mt-7 space-y-4">
               <label className="space-y-1.5">
-                <span className="form-label">Email</span>
+                <span className="form-label">Email / Login ID</span>
                 <div className="relative">
                   <Mail className="pointer-events-none absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
                   <input
-                    autoComplete="email"
+                    autoComplete="off"
                     className="form-input pl-10"
-                    type="email"
+                    type="text"
                     value={form.email}
                     onChange={(event) => setForm((current) => ({ ...current, email: event.target.value }))}
                     required
@@ -151,7 +155,7 @@ export default function Login() {
                 <div className="relative">
                   <LockKeyhole className="pointer-events-none absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
                   <input
-                    autoComplete="current-password"
+                    autoComplete="new-password"
                     className="form-input px-10"
                     type={showPassword ? "text" : "password"}
                     value={form.password}
@@ -178,7 +182,7 @@ export default function Login() {
               {loading ? "Signing in..." : "Sign in"}
             </Button>
             <div className="mt-5 rounded-lg bg-slate-50 p-3 text-xs leading-5 text-slate-500 ring-1 ring-slate-200">
-              <span className="font-bold text-slate-700">Default admin:</span> admin@hyatech.com
+              <span className="font-bold text-slate-700">Secure access:</span> Use your assigned HYA Tech credentials.
             </div>
           </form>
         </section>

@@ -211,7 +211,7 @@ export default function AttendancePage() {
           </div>
         </section>
       )}
-      <section className="panel p-5">
+      <section className="panel p-5" id="attendance-records">
         <div className="hidden overflow-x-auto md:block">
           <table className="min-w-full">
             <thead className="table-head">

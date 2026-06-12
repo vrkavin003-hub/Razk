@@ -13,8 +13,8 @@ const { authorize, protect } = require("../middleware/authMiddleware");
 const router = express.Router();
 
 router.use(protect);
-router.post("/check-in", authorize("employee", "hr", "admin"), checkIn);
-router.post("/check-out", authorize("employee", "hr", "admin"), checkOut);
+router.post("/check-in", authorize("employee", "hr", "admin", "dri"), checkIn);
+router.post("/check-out", authorize("employee", "hr", "admin", "dri"), checkOut);
 router.get("/today", getTodayAttendance);
 router.get("/my-attendance", getMyHistory);
 router.get("/my-history", getMyHistory);

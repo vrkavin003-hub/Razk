@@ -25,7 +25,7 @@ export const AuthProvider = ({ children }) => {
 
   const login = async (credentials) => {
     const payload = {
-      email: String(credentials.email || "").trim().toLowerCase(),
+      email: String(credentials.email || "").trim(),
       password: credentials.password
     };
     const { data } = await api.post("/auth/login", payload);

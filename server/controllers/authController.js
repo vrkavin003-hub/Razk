@@ -17,6 +17,8 @@ const generateToken = (id) =>
     expiresIn: "7d"
   });
 
+const escapeRegex = (value = "") => String(value).replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+
 const sanitizeUser = (user) => ({
   _id: user._id,
   name: user.name,
@@ -55,10 +57,17 @@ const login = asyncHandler(async (req, res) => {
 
   if (!email || !password) {
     res.status(400);
-    throw new Error("Email and password are required");
+    throw new Error("Email/Login ID and password are required");
   }
 
-  const user = await User.findOne({ email: email.toLowerCase() }).select("+password");
+  const loginId = String(email).trim();
+  const user = await User.findOne({
+    $or: [
+      { email: loginId.toLowerCase() },
+      { employeeId: loginId },
+      { employeeId: { $regex: `^${escapeRegex(loginId)}$`, $options: "i" } }
+    ]
+  }).select("+password");
 
   if (!user || !user.isActive || !(await user.matchPassword(password))) {
     res.status(401);
@@ -124,7 +133,33 @@ const me = asyncHandler(async (req, res) => {
   res.json({ user: sanitizeUser(req.user) });
 });
 
+const changePassword = asyncHandler(async (req, res) => {
+  const { confirmNewPassword, currentPassword, newPassword } = req.body;
+
+  if (!currentPassword || !newPassword || !confirmNewPassword) {
+    res.status(400);
+    throw new Error("Current password, new password, and confirm password are required");
+  }
+
+  if (newPassword !== confirmNewPassword) {
+    res.status(400);
+    throw new Error("New password and confirm password do not match");
+  }
+
+  const user = await User.findById(req.user._id).select("+password");
+  if (!user || !(await user.matchPassword(currentPassword))) {
+    res.status(401);
+    throw new Error("Current password is incorrect");
+  }
+
+  user.password = newPassword;
+  await user.save();
+
+  res.json({ message: "Password changed successfully" });
+});
+
 module.exports = {
+  changePassword,
   forgotPassword,
   login,
   me,

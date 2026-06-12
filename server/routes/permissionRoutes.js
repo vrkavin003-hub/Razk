@@ -11,10 +11,10 @@ const { authorize, protect } = require("../middleware/authMiddleware");
 const router = express.Router();
 
 router.use(protect);
-router.post("/apply", authorize("employee", "hr", "admin"), applyPermission);
+router.post("/apply", authorize("employee", "hr", "dri"), applyPermission);
 router.get("/my-requests", myPermissionRequests);
-router.get("/all", authorize("admin", "hr"), allPermissionRequests);
-router.put("/:id/approve", authorize("admin", "hr"), approvePermission);
-router.put("/:id/reject", authorize("admin", "hr"), rejectPermission);
+router.get("/all", authorize("admin", "hr", "dri"), allPermissionRequests);
+router.put("/:id/approve", authorize("admin", "hr", "dri"), approvePermission);
+router.put("/:id/reject", authorize("admin", "hr", "dri"), rejectPermission);
 
 module.exports = router;

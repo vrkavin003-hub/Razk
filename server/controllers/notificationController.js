@@ -38,6 +38,28 @@ const getNotificationCounts = asyncHandler(async (req, res) => {
     return;
   }
 
+  if (req.user.role === "dri") {
+    const assignedQuery = { status: "Pending", $or: [{ assignedApprover: req.user._id }, { assignedDri: req.user._id }] };
+    const [pendingLeaveCount, pendingPermissionCount, pendingODCount, leaveUpdateCount, permissionUpdateCount, odUpdateCount] =
+      await Promise.all([
+        LeaveRequest.countDocuments(assignedQuery),
+        PermissionRequest.countDocuments(assignedQuery),
+        ODRequest.countDocuments(assignedQuery),
+        Notification.countDocuments({ user: req.user._id, type: "leave", isRead: false }),
+        Notification.countDocuments({ user: req.user._id, type: "permission", isRead: false }),
+        Notification.countDocuments({ user: req.user._id, type: "od", isRead: false })
+      ]);
+    res.json({
+      odUpdateCount,
+      pendingODCount,
+      pendingLeaveCount,
+      pendingPermissionCount,
+      leaveUpdateCount,
+      permissionUpdateCount
+    });
+    return;
+  }
+
   const [leaveUpdateCount, permissionUpdateCount, odUpdateCount] = await Promise.all([
     Notification.countDocuments({ user: req.user._id, type: "leave", isRead: false }),
     Notification.countDocuments({ user: req.user._id, type: "permission", isRead: false }),

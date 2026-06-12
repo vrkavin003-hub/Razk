@@ -1,6 +1,4 @@
 const LeaveRequest = require("../models/LeaveRequest");
-const Notification = require("../models/Notification");
-const User = require("../models/User");
 const asyncHandler = require("../utils/asyncHandler");
 const {
   PAID_LEAVE_DAYS_PER_YEAR,
@@ -8,8 +6,17 @@ const {
   splitPaidAllowance,
   yearBounds
 } = require("../utils/requestBalances");
-
-const employeeFields = "name email employeeId department designation profilePhoto";
+const {
+  assertCanDecideRequest,
+  createAssignedNotification,
+  createDecisionNotifications,
+  employeeFields,
+  markDecision,
+  populateRequestQuery,
+  requestSnapshot,
+  resolveRequestAssignment,
+  visibilityQueryForUser
+} = require("../utils/requestWorkflow");
 
 const approvedLeaveDaysForYear = async (employeeId, dateValue = new Date(), excludeId = null) => {
   const { from, to } = yearBounds(dateValue);
@@ -49,8 +56,11 @@ const applyLeave = asyncHandler(async (req, res) => {
   const requestedDays = dateRangeDays(fromDate, toDate);
   const balance = await leaveBalanceForEmployee(req.user._id, fromDate);
   const allowance = splitPaidAllowance(requestedDays, balance.remaining);
+  const assignment = await resolveRequestAssignment(req.user);
 
   const leave = await LeaveRequest.create({
+    ...assignment,
+    ...requestSnapshot(req.user, "Leave"),
     employee: req.user._id,
     leaveType,
     fromDate,
@@ -65,18 +75,13 @@ const applyLeave = asyncHandler(async (req, res) => {
     yearlyPaidLeaveUsed: balance.used
   });
 
-  const reviewers = await User.find({ role: { $in: ["admin", "hr"] }, isActive: true }).select("_id");
-  if (reviewers.length) {
-    await Notification.insertMany(
-      reviewers.map((reviewer) => ({
-        user: reviewer._id,
-        title: "New leave request",
-        message: `${req.user.name} requested ${leaveType} from ${fromDate} to ${toDate}.`,
-        type: "leave",
-        createdBy: req.user._id
-      }))
-    );
-  }
+  await createAssignedNotification({
+    request: leave,
+    requester: req.user,
+    type: "leave",
+    title: "New leave request assigned",
+    message: `${req.user.name} (${req.user.role?.toUpperCase()}) requested ${leaveType} from ${fromDate} to ${toDate}.`
+  });
 
   res.status(201).json({
     balance: {
@@ -91,22 +96,15 @@ const applyLeave = asyncHandler(async (req, res) => {
 });
 
 const myLeaveRequests = asyncHandler(async (req, res) => {
-  const leaves = await LeaveRequest.find({ employee: req.user._id })
-    .populate("employee", employeeFields)
-    .populate("approvedBy", "name role")
-    .sort({ createdAt: -1 });
+  const leaves = await populateRequestQuery(LeaveRequest.find({ employee: req.user._id })).sort({ createdAt: -1 });
 
   res.json({ balance: await leaveBalanceForEmployee(req.user._id), leaves });
 });
 
 const allLeaveRequests = asyncHandler(async (req, res) => {
-  const query = {};
-  if (req.query.status) query.status = req.query.status;
+  const query = visibilityQueryForUser(req.user, req.query.status);
 
-  const leaves = await LeaveRequest.find(query)
-    .populate("employee", employeeFields)
-    .populate("approvedBy", "name role")
-    .sort({ createdAt: -1 });
+  const leaves = await populateRequestQuery(LeaveRequest.find(query)).sort({ createdAt: -1 });
 
   const balances = {};
   for (const leave of leaves) {
@@ -126,6 +124,8 @@ const decideLeave = (status) =>
       throw new Error("Leave request not found");
     }
 
+    assertCanDecideRequest(req.user, leave);
+
     const requestedDays = Number(leave.requestedDays || dateRangeDays(leave.fromDate, leave.toDate));
     const used = await approvedLeaveDaysForYear(leave.employee, leave.fromDate, leave._id);
     const balance = {
@@ -135,10 +135,7 @@ const decideLeave = (status) =>
     };
     const allowance = status === "Approved" ? splitPaidAllowance(requestedDays, balance.remaining) : { limitExceeded: leave.limitExceeded, paid: leave.paidDays || 0, unpaid: leave.unpaidDays || 0 };
 
-    leave.status = status;
-    leave.adminRemarks = req.body.adminRemarks || req.body.remarks || "";
-    leave.approvedBy = req.user._id;
-    leave.decidedAt = new Date();
+    markDecision(leave, req.user, status, req.body.adminRemarks || req.body.remarks || "");
     leave.limitExceeded = allowance.limitExceeded;
     leave.paidDays = allowance.paid;
     leave.requestedDays = requestedDays;
@@ -147,17 +144,14 @@ const decideLeave = (status) =>
     leave.yearlyPaidLeaveUsed = balance.used;
     await leave.save();
 
-    await Notification.create({
-      user: leave.employee,
-      title: `Leave ${status.toLowerCase()}`,
-      message: `Your leave request was ${status.toLowerCase()} by ${req.user.name}.`,
-      type: "leave",
-      createdBy: req.user._id
+    await createDecisionNotifications({
+      request: leave,
+      actor: req.user,
+      status,
+      type: "leave"
     });
 
-    const populated = await LeaveRequest.findById(leave._id)
-      .populate("employee", employeeFields)
-      .populate("approvedBy", "name role");
+    const populated = await populateRequestQuery(LeaveRequest.findById(leave._id));
 
     res.json({
       leave: populated,

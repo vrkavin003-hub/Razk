@@ -30,6 +30,25 @@ const odRequestSchema = new mongoose.Schema(
       trim: true
     },
     attachment: String,
+    requestType: {
+      type: String,
+      default: "OD"
+    },
+    requesterName: String,
+    requesterRole: String,
+    requesterDepartment: String,
+    requestRaisedAt: Date,
+    assignedApproverRole: String,
+    assignedApprover: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "User"
+    },
+    assignedApproverName: String,
+    assignedDri: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "User"
+    },
+    assignedDriName: String,
     status: {
       type: String,
       enum: ["Pending", "Approved", "Rejected"],
@@ -40,7 +59,16 @@ const odRequestSchema = new mongoose.Schema(
       type: mongoose.Schema.Types.ObjectId,
       ref: "User"
     },
-    decidedAt: Date
+    decidedAt: Date,
+    reactedBy: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "User"
+    },
+    reactedByName: String,
+    reactedByRole: String,
+    reactedAt: Date,
+    approvalComment: String,
+    rejectionReason: String
   },
   { timestamps: true }
 );

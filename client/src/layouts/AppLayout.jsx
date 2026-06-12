@@ -33,16 +33,21 @@ const navItems = [
   { label: "Dashboard", path: "/admin", icon: LayoutDashboard, roles: ["admin"], section: "Overview" },
   { label: "Dashboard", path: "/hr", icon: LayoutDashboard, roles: ["hr"], section: "Overview" },
   { label: "Dashboard", path: "/employee", icon: LayoutDashboard, roles: ["employee"], section: "Overview" },
+  { label: "Dashboard", path: "/dri", icon: LayoutDashboard, roles: ["dri"], section: "Overview" },
   { label: "Employees", path: "/employees", icon: Users, roles: ["admin", "hr"], section: "People" },
   { label: "Add Employee", path: "/employees/new", icon: UserPlus, roles: ["admin", "hr"], section: "People" },
   { label: "Attendance", path: "/attendance", icon: CalendarCheck, roles: ["admin", "hr", "employee"], section: "Operations" },
+  { label: "Attendance", path: "/attendance", icon: CalendarCheck, roles: ["dri"], section: "Operations" },
   { label: "Reports", path: "/attendance/reports", icon: BarChart3, roles: ["admin", "hr"], section: "Operations" },
   { label: "Customer / Visitor Visits", path: "/visitors", icon: UserCheck, roles: ["admin", "hr"], section: "Operations" },
   { label: "Leave", path: "/leave", icon: FileText, roles: ["admin", "hr", "employee"], section: "Requests" },
   { label: "Permission", path: "/permission", icon: ClipboardList, roles: ["admin", "hr", "employee"], section: "Requests" },
   { label: "OD Requests", path: "/od", icon: Briefcase, roles: ["admin", "hr", "employee"], section: "Requests" },
+  { label: "Assigned Requests", path: "/dri/assigned-requests", icon: ClipboardList, roles: ["dri"], section: "Requests" },
+  { label: "My Requests", path: "/dri/my-requests", icon: FileText, roles: ["dri"], section: "Requests" },
   { label: "Announcements", path: "/announcements", icon: Bell, roles: ["admin", "hr", "employee"], section: "Comms" },
   { label: "Profile", path: "/profile", icon: ShieldCheck, roles: ["admin", "hr", "employee"], section: "Account" },
+  { label: "Profile", path: "/profile", icon: ShieldCheck, roles: ["dri"], section: "Account" },
   { label: "Settings", path: "/settings", icon: Settings, roles: ["admin", "hr", "employee"], section: "Account" }
 ];
 
@@ -136,6 +141,12 @@ export default function AppLayout() {
     if (path === "/od") {
       return roleMatches(user?.role, ["admin", "hr"]) ? counts.pendingODCount : counts.odUpdateCount;
     }
+    if (path === "/dri/assigned-requests") {
+      return (counts.pendingLeaveCount || 0) + (counts.pendingPermissionCount || 0) + (counts.pendingODCount || 0);
+    }
+    if (path === "/dri/my-requests") {
+      return (counts.leaveUpdateCount || 0) + (counts.permissionUpdateCount || 0) + (counts.odUpdateCount || 0);
+    }
     return 0;
   };
 
@@ -144,6 +155,8 @@ export default function AppLayout() {
     if (item.path === "/permission") {
       return roleMatches(user?.role, ["admin", "hr"]) ? "Permission Requests" : "My Permission";
     }
+    if (item.path === "/dri/assigned-requests") return "Assigned Requests";
+    if (item.path === "/dri/my-requests") return "My Requests";
     return item.label;
   };
   const currentLabel = activeItem ? menuLabel(activeItem) : "Workspace";
@@ -227,9 +240,9 @@ export default function AppLayout() {
       className={`theme-${theme} min-h-mobile bg-[#f6f8fb] text-slate-900 dark:bg-hya-950 dark:text-blue-50`}
       data-theme={theme}
     >
-      <div className="hidden lg:fixed lg:inset-y-0 lg:flex">{sidebar}</div>
+      <div className="hidden md:fixed md:inset-y-0 md:flex">{sidebar}</div>
       {open ? (
-        <div className="fixed inset-0 z-40 lg:hidden">
+        <div className="fixed inset-0 z-40 md:hidden">
           <button
             className="absolute inset-0 bg-slate-900/40 dark:bg-blue-950/70"
             onClick={() => setOpen(false)}
@@ -238,11 +251,11 @@ export default function AppLayout() {
           <div className="absolute inset-y-0 left-0">{sidebar}</div>
         </div>
       ) : null}
-      <div className="lg:pl-72">
-        <header className="mobile-safe-top sticky top-0 z-20 flex min-h-[72px] items-center justify-between border-b border-slate-200 bg-white/90 px-4 py-3 backdrop-blur-xl lg:px-8 dark:border-[#203e6f] dark:bg-[#09192e]/95">
+      <div className="md:pl-72">
+        <header className="mobile-safe-top sticky top-0 z-20 flex min-h-[72px] items-center justify-between border-b border-slate-200 bg-white/90 px-4 py-3 backdrop-blur-xl md:px-8 dark:border-[#203e6f] dark:bg-[#09192e]/95">
           <div className="flex min-w-0 items-center gap-3">
             <button
-              className="inline-grid h-10 w-10 place-items-center rounded-lg border border-slate-200 bg-white text-slate-700 shadow-sm shadow-slate-900/5 lg:hidden dark:border-[#24456f] dark:bg-[#0c1f3d] dark:text-blue-100"
+              className="inline-grid h-10 w-10 place-items-center rounded-lg border border-slate-200 bg-white text-slate-700 shadow-sm shadow-slate-900/5 md:hidden dark:border-[#24456f] dark:bg-[#0c1f3d] dark:text-blue-100"
               onClick={() => setOpen((current) => !current)}
               aria-label="Open menu"
             >
@@ -268,7 +281,7 @@ export default function AppLayout() {
             <UserAvatar className="shadow-sm shadow-hya-600/20" name={user?.name} photo={user?.profilePhoto} />
           </div>
         </header>
-        <main className="mobile-safe-page mx-auto w-full max-w-[1500px] px-4 py-6 lg:px-8 lg:py-8">
+        <main className="mobile-safe-page mx-auto w-full max-w-[1500px] px-4 py-6 md:px-8 md:py-8">
           <Outlet />
         </main>
       </div>

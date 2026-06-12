@@ -1,6 +1,7 @@
 export const dashboardPathForRole = (role) => {
   if (role === "admin" || role === "super_admin") return "/admin";
   if (role === "hr") return "/hr";
+  if (role === "dri") return "/dri";
   return "/employee";
 };
 

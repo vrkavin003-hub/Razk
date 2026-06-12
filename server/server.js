@@ -138,7 +138,7 @@ const startServer = async () => {
       runtimeState.database = { mode: "mongodb", status: "connected", message: "MongoDB connection is active" };
       mountMongoApi();
     } catch (error) {
-      if (process.env.ALLOW_LOCAL_STORE === "false") {
+      if (process.env.ALLOW_LOCAL_STORE !== "true") {
         runtimeState.database = { mode: "mongodb", status: "error", message: error.message };
         throw error;
       }

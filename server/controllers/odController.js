@@ -1,11 +1,18 @@
 const Attendance = require("../models/Attendance");
-const Notification = require("../models/Notification");
 const ODRequest = require("../models/ODRequest");
-const User = require("../models/User");
 const asyncHandler = require("../utils/asyncHandler");
 const { toDateKey } = require("../utils/dates");
-
-const employeeFields = "name email employeeId department designation profilePhoto";
+const {
+  assertCanDecideRequest,
+  createAssignedNotification,
+  createDecisionNotifications,
+  employeeFields,
+  markDecision,
+  populateRequestQuery,
+  requestSnapshot,
+  resolveRequestAssignment,
+  visibilityQueryForUser
+} = require("../utils/requestWorkflow");
 
 const applyOD = asyncHandler(async (req, res) => {
   const { attachment, fromTime, location, odDate, reason, toTime } = req.body;
@@ -14,7 +21,10 @@ const applyOD = asyncHandler(async (req, res) => {
     throw new Error("OD date, from time, to time, reason, and location are required");
   }
 
+  const assignment = await resolveRequestAssignment(req.user);
   const od = await ODRequest.create({
+    ...assignment,
+    ...requestSnapshot(req.user, "OD"),
     attachment,
     employee: req.user._id,
     fromTime,
@@ -24,37 +34,25 @@ const applyOD = asyncHandler(async (req, res) => {
     toTime
   });
 
-  const reviewers = await User.find({ role: { $in: ["admin", "hr"] }, isActive: true }).select("_id");
-  if (reviewers.length) {
-    await Notification.insertMany(
-      reviewers.map((reviewer) => ({
-        user: reviewer._id,
-        title: "New OD request",
-        message: `${req.user.name} requested OD on ${odDate}.`,
-        type: "od",
-        createdBy: req.user._id
-      }))
-    );
-  }
+  await createAssignedNotification({
+    request: od,
+    requester: req.user,
+    type: "od",
+    title: "New OD request assigned",
+    message: `${req.user.name} (${req.user.role?.toUpperCase()}) requested OD on ${odDate}.`
+  });
 
   res.status(201).json({ od });
 });
 
 const myODRequests = asyncHandler(async (req, res) => {
-  const requests = await ODRequest.find({ employee: req.user._id })
-    .populate("employee", employeeFields)
-    .populate("approvedBy", "name role")
-    .sort({ createdAt: -1 });
+  const requests = await populateRequestQuery(ODRequest.find({ employee: req.user._id })).sort({ createdAt: -1 });
   res.json({ requests });
 });
 
 const allODRequests = asyncHandler(async (req, res) => {
-  const query = {};
-  if (req.query.status) query.status = req.query.status;
-  const requests = await ODRequest.find(query)
-    .populate("employee", employeeFields)
-    .populate("approvedBy", "name role")
-    .sort({ createdAt: -1 });
+  const query = visibilityQueryForUser(req.user, req.query.status);
+  const requests = await populateRequestQuery(ODRequest.find(query)).sort({ createdAt: -1 });
   res.json({ requests });
 });
 
@@ -66,10 +64,9 @@ const decideOD = (status) =>
       throw new Error("OD request not found");
     }
 
-    od.status = status;
-    od.adminRemarks = req.body.adminRemarks || req.body.remarks || "";
-    od.approvedBy = req.user._id;
-    od.decidedAt = new Date();
+    assertCanDecideRequest(req.user, od);
+
+    markDecision(od, req.user, status, req.body.adminRemarks || req.body.remarks || "");
     await od.save();
 
     if (status === "Approved") {
@@ -83,6 +80,7 @@ const decideOD = (status) =>
             date,
             checkIn: new Date(`${date}T${od.fromTime}:00`),
             checkOut: new Date(`${date}T${od.toTime}:00`),
+            shiftName: "OD",
             checkInLocationStatus: "Location not available",
             checkOutLocationStatus: "Location not available",
             workingHours: 0
@@ -96,17 +94,14 @@ const decideOD = (status) =>
       );
     }
 
-    await Notification.create({
-      user: od.employee._id,
-      title: `OD ${status.toLowerCase()}`,
-      message: `Your OD request was ${status.toLowerCase()} by ${req.user.name}.`,
-      type: "od",
-      createdBy: req.user._id
+    await createDecisionNotifications({
+      request: od,
+      actor: req.user,
+      status,
+      type: "od"
     });
 
-    const populated = await ODRequest.findById(od._id)
-      .populate("employee", employeeFields)
-      .populate("approvedBy", "name role");
+    const populated = await populateRequestQuery(ODRequest.findById(od._id));
     res.json({ od: populated });
   });
 

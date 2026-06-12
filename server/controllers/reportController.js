@@ -9,6 +9,7 @@ const {
   buildMonthlyReport,
   sendReportPdf
 } = require("../utils/reportBuilder");
+const { sendReportExcel } = require("../utils/excelReportBuilder");
 
 const requireDateRange = (req) => {
   const { from, to } = req.query;
@@ -78,6 +79,7 @@ const findEmployee = async (identifier) => {
 
 const canAccessEmployeeReport = (user, employee) => {
   if (["admin", "hr"].includes(user.role)) return true;
+  if (user.role === "dri") return false;
   return String(user._id) === String(employee._id) || user.employeeId === employee.employeeId;
 };
 
@@ -121,7 +123,7 @@ const getMonthlyReportData = async ({ month, year, generatedBy }) => {
   const from = `${year}-${String(month).padStart(2, "0")}-01`;
   const to = new Date(Number(year), Number(month), 0).toISOString().slice(0, 10);
   const [employees, attendance, leaves] = await Promise.all([
-    User.find({ isActive: true, role: { $in: ["employee", "hr"] } }).sort({ employeeId: 1 }),
+    User.find({ isActive: true, role: { $in: ["employee", "hr", "dri"] } }).sort({ employeeId: 1 }),
     Attendance.find({ date: { $gte: from, $lte: to } }),
     LeaveRequest.find({
       status: "Approved",
@@ -142,7 +144,7 @@ const getMonthlyReportData = async ({ month, year, generatedBy }) => {
 
 const getDepartmentReportData = async ({ department, from, to, generatedBy }) => {
   const [employees, attendance, leaves] = await Promise.all([
-    User.find({ isActive: true, department, role: { $in: ["employee", "hr"] } }).sort({ employeeId: 1 }),
+    User.find({ isActive: true, department, role: { $in: ["employee", "hr", "dri"] } }).sort({ employeeId: 1 }),
     Attendance.find({ date: { $gte: from, $lte: to } }),
     LeaveRequest.find({
       status: "Approved",
@@ -164,7 +166,7 @@ const getDepartmentReportData = async ({ department, from, to, generatedBy }) =>
 
 const getAllRangeReportData = async ({ from, to, generatedBy }) => {
   const [employees, attendance, leaves] = await Promise.all([
-    User.find({ isActive: true, role: { $in: ["employee", "hr"] } }).sort({ employeeId: 1 }),
+    User.find({ isActive: true, role: { $in: ["employee", "hr", "dri"] } }).sort({ employeeId: 1 }),
     Attendance.find({ date: { $gte: from, $lte: to } }),
     LeaveRequest.find({
       status: "Approved",
@@ -267,6 +269,17 @@ const employeePdf = asyncHandler(async (req, res) => {
   sendReportPdf(res, report, `employee-attendance-${report.employee.employeeId}.pdf`);
 });
 
+const employeeExcel = asyncHandler(async (req, res) => {
+  const { from, to } = requireDateRange(req);
+  const report = await getEmployeeReportData({
+    employeeIdentifier: req.params.employeeId,
+    from,
+    to,
+    generatedBy: req.user
+  });
+  await sendReportExcel(res, report, `employee-attendance-${report.employee.employeeId}.xlsx`);
+});
+
 const monthlyPdf = asyncHandler(async (req, res) => {
   const report = await getMonthlyReportData({
     month: req.query.month,
@@ -274,6 +287,15 @@ const monthlyPdf = asyncHandler(async (req, res) => {
     generatedBy: req.user
   });
   sendReportPdf(res, report, `monthly-attendance-${req.query.year}-${req.query.month}.pdf`);
+});
+
+const monthlyExcel = asyncHandler(async (req, res) => {
+  const report = await getMonthlyReportData({
+    month: req.query.month,
+    year: req.query.year,
+    generatedBy: req.user
+  });
+  await sendReportExcel(res, report, `monthly-attendance-${req.query.year}-${req.query.month}.xlsx`);
 });
 
 const departmentPdf = asyncHandler(async (req, res) => {
@@ -285,6 +307,17 @@ const departmentPdf = asyncHandler(async (req, res) => {
     generatedBy: req.user
   });
   sendReportPdf(res, report, `department-attendance-${req.params.department}.pdf`);
+});
+
+const departmentExcel = asyncHandler(async (req, res) => {
+  const { from, to } = requireDateRange(req);
+  const report = await getDepartmentReportData({
+    department: req.params.department,
+    from,
+    to,
+    generatedBy: req.user
+  });
+  await sendReportExcel(res, report, `department-attendance-${req.params.department}.xlsx`);
 });
 
 const customPdf = asyncHandler(async (req, res) => {
@@ -316,13 +349,51 @@ const customPdf = asyncHandler(async (req, res) => {
   return monthlyPdf(req, res);
 });
 
+const customExcel = asyncHandler(async (req, res) => {
+  if (req.query.type === "employee") {
+    const { from, to } = requireDateRange(req);
+    const report = await getEmployeeReportData({
+      employeeIdentifier: req.query.employeeId,
+      from,
+      to,
+      generatedBy: req.user
+    });
+    return sendReportExcel(res, report, `employee-attendance-${report.employee.employeeId}.xlsx`);
+  }
+  if (req.query.type === "department") {
+    const { from, to } = requireDateRange(req);
+    const report = await getDepartmentReportData({
+      department: req.query.department,
+      from,
+      to,
+      generatedBy: req.user
+    });
+    return sendReportExcel(res, report, `department-attendance-${req.query.department}.xlsx`);
+  }
+  if (req.query.type === "all") {
+    const { from, to } = requireDateRange(req);
+    const report = await getAllRangeReportData({ from, to, generatedBy: req.user });
+    return sendReportExcel(res, report, `attendance-${from}-to-${to}.xlsx`);
+  }
+  const report = await getMonthlyReportData({
+    month: req.query.month || new Date().getMonth() + 1,
+    year: req.query.year || new Date().getFullYear(),
+    generatedBy: req.user
+  });
+  return sendReportExcel(res, report, `monthly-attendance-${report.year}-${report.month}.xlsx`);
+});
+
 module.exports = {
+  customExcel,
   customPdf,
+  departmentExcel,
   departmentPdf,
+  employeeExcel,
   employeePdf,
   getCustomReport,
   getDepartmentReport,
   getEmployeeReport,
   getMonthlyReport,
+  monthlyExcel,
   monthlyPdf
 };

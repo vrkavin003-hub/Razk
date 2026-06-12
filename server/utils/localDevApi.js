@@ -23,6 +23,7 @@ const {
   buildMonthlyReport,
   sendReportPdf
 } = require("./reportBuilder");
+const { sendReportExcel } = require("./excelReportBuilder");
 
 const DATA_DIR = path.join(__dirname, "..", "data");
 const DATA_FILE = path.join(DATA_DIR, "local-dev-db.json");
@@ -950,7 +951,7 @@ const mountLocalDevApi = (app) => {
     });
   });
 
-  app.get("/api/leave/all", protect, authorize("admin", "hr"), (req, res) => {
+  app.get("/api/leave/all", protect, authorize("admin", "hr", "dri"), (req, res) => {
     let leaves = [...db.leaves];
     if (req.query.status) leaves = leaves.filter((leave) => leave.status === req.query.status);
     const balances = {};
@@ -997,8 +998,8 @@ const mountLocalDevApi = (app) => {
         : ""
     });
   };
-  app.put("/api/leave/:id/approve", protect, authorize("admin", "hr"), decideLeave("Approved"));
-  app.put("/api/leave/:id/reject", protect, authorize("admin", "hr"), decideLeave("Rejected"));
+  app.put("/api/leave/:id/approve", protect, authorize("admin", "hr", "dri"), decideLeave("Approved"));
+  app.put("/api/leave/:id/reject", protect, authorize("admin", "hr", "dri"), decideLeave("Rejected"));
 
   app.post("/api/permission/apply", protect, (req, res) => {
     const { permissionType, date, fromTime, toTime, reason } = req.body;
@@ -1054,7 +1055,7 @@ const mountLocalDevApi = (app) => {
     });
   });
 
-  app.get("/api/permission/all", protect, authorize("admin", "hr"), (req, res) => {
+  app.get("/api/permission/all", protect, authorize("admin", "hr", "dri"), (req, res) => {
     let permissions = [...db.permissions];
     if (req.query.status) permissions = permissions.filter((permission) => permission.status === req.query.status);
     const balances = {};
@@ -1101,8 +1102,8 @@ const mountLocalDevApi = (app) => {
         : ""
     });
   };
-  app.put("/api/permission/:id/approve", protect, authorize("admin", "hr"), decidePermission("Approved"));
-  app.put("/api/permission/:id/reject", protect, authorize("admin", "hr"), decidePermission("Rejected"));
+  app.put("/api/permission/:id/approve", protect, authorize("admin", "hr", "dri"), decidePermission("Approved"));
+  app.put("/api/permission/:id/reject", protect, authorize("admin", "hr", "dri"), decidePermission("Rejected"));
 
   app.get("/api/visitors", protect, authorize("admin", "hr"), (req, res) => {
     let visitors = [...db.visitors];
@@ -1211,7 +1212,7 @@ const mountLocalDevApi = (app) => {
     });
   });
 
-  app.get("/api/od/all", protect, authorize("admin", "hr"), (req, res) => {
+  app.get("/api/od/all", protect, authorize("admin", "hr", "dri"), (req, res) => {
     let requests = [...db.odRequests];
     if (req.query.status) requests = requests.filter((request) => request.status === req.query.status);
     return json(res, { requests: requests.map(populateDecision).reverse() });
@@ -1268,8 +1269,8 @@ const mountLocalDevApi = (app) => {
     return json(res, { od: populateDecision(od) });
   };
 
-  app.put("/api/od/:id/approve", protect, authorize("admin", "hr"), decideOd("Approved"));
-  app.put("/api/od/:id/reject", protect, authorize("admin", "hr"), decideOd("Rejected"));
+  app.put("/api/od/:id/approve", protect, authorize("admin", "hr", "dri"), decideOd("Approved"));
+  app.put("/api/od/:id/reject", protect, authorize("admin", "hr", "dri"), decideOd("Rejected"));
 
   app.get("/api/announcements", protect, (req, res) => {
     const announcements = db.announcements
@@ -1443,6 +1444,17 @@ const mountLocalDevApi = (app) => {
     return sendReportPdf(res, report, `employee-attendance-${report.employee.employeeId}.pdf`);
   });
 
+  app.get("/api/reports/employee/:employeeId/excel", protect, (req, res) => {
+    if (!req.query.from || !req.query.to) return json(res, { message: "from and to query parameters are required" }, 400);
+    const report = localEmployeeReport({
+      employeeId: req.params.employeeId,
+      from: req.query.from,
+      to: req.query.to,
+      generatedBy: req.user
+    });
+    return sendReportExcel(res, report, `employee-attendance-${report.employee.employeeId}.xlsx`);
+  });
+
   app.get("/api/reports/monthly", protect, authorize("admin", "hr"), (req, res) => {
     if (!req.query.month || !req.query.year) return json(res, { message: "month and year query parameters are required" }, 400);
     return json(res, {
@@ -1462,6 +1474,16 @@ const mountLocalDevApi = (app) => {
       generatedBy: req.user
     });
     return sendReportPdf(res, report, `monthly-attendance-${req.query.year}-${req.query.month}.pdf`);
+  });
+
+  app.get("/api/reports/monthly/excel", protect, authorize("admin", "hr"), (req, res) => {
+    if (!req.query.month || !req.query.year) return json(res, { message: "month and year query parameters are required" }, 400);
+    const report = localMonthlyReport({
+      month: req.query.month,
+      year: req.query.year,
+      generatedBy: req.user
+    });
+    return sendReportExcel(res, report, `monthly-attendance-${req.query.year}-${req.query.month}.xlsx`);
   });
 
   app.get("/api/reports/department/:department", protect, authorize("admin", "hr"), (req, res) => {
@@ -1485,6 +1507,17 @@ const mountLocalDevApi = (app) => {
       generatedBy: req.user
     });
     return sendReportPdf(res, report, `department-attendance-${req.params.department}.pdf`);
+  });
+
+  app.get("/api/reports/department/:department/excel", protect, authorize("admin", "hr"), (req, res) => {
+    if (!req.query.from || !req.query.to) return json(res, { message: "from and to query parameters are required" }, 400);
+    const report = localDepartmentReport({
+      department: req.params.department,
+      from: req.query.from,
+      to: req.query.to,
+      generatedBy: req.user
+    });
+    return sendReportExcel(res, report, `department-attendance-${req.params.department}.xlsx`);
   });
 
   app.get("/api/reports/custom", protect, authorize("admin", "hr"), (req, res) => {
@@ -1559,6 +1592,41 @@ const mountLocalDevApi = (app) => {
       generatedBy: req.user
     });
     return sendReportPdf(res, report, `monthly-attendance-${req.query.year}-${req.query.month}.pdf`);
+  });
+
+  app.get("/api/reports/custom/excel", protect, authorize("admin", "hr"), (req, res) => {
+    if (req.query.type === "employee") {
+      const report = localEmployeeReport({
+        employeeId: req.query.employeeId,
+        from: req.query.from,
+        to: req.query.to,
+        generatedBy: req.user
+      });
+      return sendReportExcel(res, report, `employee-attendance-${report.employee.employeeId}.xlsx`);
+    }
+    if (req.query.type === "department") {
+      const report = localDepartmentReport({
+        department: req.query.department,
+        from: req.query.from,
+        to: req.query.to,
+        generatedBy: req.user
+      });
+      return sendReportExcel(res, report, `department-attendance-${req.query.department}.xlsx`);
+    }
+    if (req.query.type === "all") {
+      const report = localAllRangeReport({
+        from: req.query.from,
+        to: req.query.to,
+        generatedBy: req.user
+      });
+      return sendReportExcel(res, report, `attendance-${req.query.from}-to-${req.query.to}.xlsx`);
+    }
+    const report = localMonthlyReport({
+      month: req.query.month,
+      year: req.query.year,
+      generatedBy: req.user
+    });
+    return sendReportExcel(res, report, `monthly-attendance-${req.query.year}-${req.query.month}.xlsx`);
   });
 
   console.log(`Local development data store active: ${DATA_FILE}`);

@@ -12,7 +12,16 @@ export const getApiBaseUrl = () => {
     return import.meta.env.DEV ? "http://10.0.2.2:5000/api" : "";
   }
 
-  return import.meta.env.DEV ? "http://localhost:5000/api" : "/api";
+  if (import.meta.env.DEV) return "http://localhost:5000/api";
+
+  if (typeof window !== "undefined") {
+    const hostname = window.location.hostname;
+    if (window.location.protocol === "file:" || hostname === "localhost" || hostname === "127.0.0.1") {
+      return "http://localhost:5000/api";
+    }
+  }
+
+  return "/api";
 };
 
 export const API_BASE_URL = getApiBaseUrl();

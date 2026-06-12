@@ -1,4 +1,4 @@
-import { Download, FileText, Search } from "lucide-react";
+import { Download, FileSpreadsheet, FileText, Search } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import toast from "react-hot-toast";
 import AnnouncementCard from "../components/AnnouncementCard";
@@ -61,8 +61,8 @@ export default function AttendanceReports() {
     [employees]
   );
 
-  const reportEndpoint = (pdf = false) => {
-    const suffix = pdf ? "/pdf" : "";
+  const reportEndpoint = (format = "") => {
+    const suffix = format ? `/${format}` : "";
     if (filters.type === "employee") {
       return {
         url: `/reports/employee/${encodeURIComponent(filters.employeeId)}${suffix}`,
@@ -122,7 +122,7 @@ export default function AttendanceReports() {
     }
 
     try {
-      const endpoint = reportEndpoint(true);
+      const endpoint = reportEndpoint("pdf");
       const response = await api.get(endpoint.url, {
         params: endpoint.params,
         responseType: "blob"
@@ -131,6 +131,30 @@ export default function AttendanceReports() {
       const link = document.createElement("a");
       link.href = url;
       link.download = `${filters.type}-attendance-report.pdf`;
+      link.click();
+      window.URL.revokeObjectURL(url);
+    } catch (error) {
+      toast.error(error.message);
+    }
+  };
+
+  const exportExcel = async () => {
+    const validation = validate();
+    if (validation) {
+      toast.error(validation);
+      return;
+    }
+
+    try {
+      const endpoint = reportEndpoint("excel");
+      const response = await api.get(endpoint.url, {
+        params: endpoint.params,
+        responseType: "blob"
+      });
+      const url = window.URL.createObjectURL(response.data);
+      const link = document.createElement("a");
+      link.href = url;
+      link.download = `${filters.type}-attendance-report.xlsx`;
       link.click();
       window.URL.revokeObjectURL(url);
     } catch (error) {
@@ -156,11 +180,16 @@ export default function AttendanceReports() {
     <>
       <PageHeader
         title="Reports"
-        description="Generate professional attendance reports and export PDF files with HYA Tech branding."
+        description="Generate professional attendance reports and export PDF or Excel files with HYA Tech branding."
         action={
-          <Button icon={Download} onClick={exportPdf}>
-            Export PDF
-          </Button>
+          <div className="flex flex-wrap gap-2">
+            <Button icon={FileSpreadsheet} onClick={exportExcel} variant="secondary">
+              Export Excel
+            </Button>
+            <Button icon={Download} onClick={exportPdf}>
+              Export PDF
+            </Button>
+          </div>
         }
       />
       <section className="panel p-5">
@@ -256,6 +285,9 @@ export default function AttendanceReports() {
               </div>
               <Button icon={Download} onClick={exportPdf} variant="secondary">
                 Download PDF
+              </Button>
+              <Button icon={FileSpreadsheet} onClick={exportExcel} variant="secondary">
+                Download Excel
               </Button>
             </div>
             {report.employee ? (

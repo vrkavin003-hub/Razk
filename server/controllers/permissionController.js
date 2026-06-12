@@ -1,6 +1,4 @@
 const PermissionRequest = require("../models/PermissionRequest");
-const Notification = require("../models/Notification");
-const User = require("../models/User");
 const asyncHandler = require("../utils/asyncHandler");
 const {
   PAID_PERMISSION_HOURS_PER_MONTH,
@@ -8,8 +6,17 @@ const {
   permissionHours,
   splitPaidAllowance
 } = require("../utils/requestBalances");
-
-const employeeFields = "name email employeeId department designation profilePhoto";
+const {
+  assertCanDecideRequest,
+  createAssignedNotification,
+  createDecisionNotifications,
+  employeeFields,
+  markDecision,
+  populateRequestQuery,
+  requestSnapshot,
+  resolveRequestAssignment,
+  visibilityQueryForUser
+} = require("../utils/requestWorkflow");
 
 const approvedPermissionHoursForMonth = async (employeeId, dateValue = new Date(), excludeId = null) => {
   const { from, to } = monthBounds(dateValue);
@@ -47,8 +54,11 @@ const applyPermission = asyncHandler(async (req, res) => {
   }
   const balance = await permissionBalanceForEmployee(req.user._id, date);
   const allowance = splitPaidAllowance(requestedHours, balance.remaining);
+  const assignment = await resolveRequestAssignment(req.user);
 
   const permission = await PermissionRequest.create({
+    ...assignment,
+    ...requestSnapshot(req.user, "Permission"),
     employee: req.user._id,
     permissionType,
     date,
@@ -63,18 +73,13 @@ const applyPermission = asyncHandler(async (req, res) => {
     unpaidHours: allowance.unpaid
   });
 
-  const reviewers = await User.find({ role: { $in: ["admin", "hr"] }, isActive: true }).select("_id");
-  if (reviewers.length) {
-    await Notification.insertMany(
-      reviewers.map((reviewer) => ({
-        user: reviewer._id,
-        title: "New permission request",
-        message: `${req.user.name} requested ${permissionType} on ${date}.`,
-        type: "permission",
-        createdBy: req.user._id
-      }))
-    );
-  }
+  await createAssignedNotification({
+    request: permission,
+    requester: req.user,
+    type: "permission",
+    title: "New permission request assigned",
+    message: `${req.user.name} (${req.user.role?.toUpperCase()}) requested ${permissionType} on ${date}.`
+  });
 
   res.status(201).json({
     balance: {
@@ -89,22 +94,15 @@ const applyPermission = asyncHandler(async (req, res) => {
 });
 
 const myPermissionRequests = asyncHandler(async (req, res) => {
-  const permissions = await PermissionRequest.find({ employee: req.user._id })
-    .populate("employee", employeeFields)
-    .populate("approvedBy", "name role")
-    .sort({ createdAt: -1 });
+  const permissions = await populateRequestQuery(PermissionRequest.find({ employee: req.user._id })).sort({ createdAt: -1 });
 
   res.json({ balance: await permissionBalanceForEmployee(req.user._id), permissions });
 });
 
 const allPermissionRequests = asyncHandler(async (req, res) => {
-  const query = {};
-  if (req.query.status) query.status = req.query.status;
+  const query = visibilityQueryForUser(req.user, req.query.status);
 
-  const permissions = await PermissionRequest.find(query)
-    .populate("employee", employeeFields)
-    .populate("approvedBy", "name role")
-    .sort({ createdAt: -1 });
+  const permissions = await populateRequestQuery(PermissionRequest.find(query)).sort({ createdAt: -1 });
 
   const balances = {};
   for (const permission of permissions) {
@@ -124,6 +122,8 @@ const decidePermission = (status) =>
       throw new Error("Permission request not found");
     }
 
+    assertCanDecideRequest(req.user, permission);
+
     const requestedHours = Number(permission.requestedHours || permissionHours(permission.fromTime, permission.toTime));
     const used = await approvedPermissionHoursForMonth(permission.employee, permission.date, permission._id);
     const balance = {
@@ -133,10 +133,7 @@ const decidePermission = (status) =>
     };
     const allowance = status === "Approved" ? splitPaidAllowance(requestedHours, balance.remaining) : { limitExceeded: permission.limitExceeded, paid: permission.paidHours || 0, unpaid: permission.unpaidHours || 0 };
 
-    permission.status = status;
-    permission.adminRemarks = req.body.adminRemarks || req.body.remarks || "";
-    permission.approvedBy = req.user._id;
-    permission.decidedAt = new Date();
+    markDecision(permission, req.user, status, req.body.adminRemarks || req.body.remarks || "");
     permission.limitExceeded = allowance.limitExceeded;
     permission.monthlyPaidPermissionRemaining = Math.max(balance.remaining - allowance.paid, 0);
     permission.monthlyPaidPermissionUsed = balance.used;
@@ -145,17 +142,14 @@ const decidePermission = (status) =>
     permission.unpaidHours = allowance.unpaid;
     await permission.save();
 
-    await Notification.create({
-      user: permission.employee,
-      title: `Permission ${status.toLowerCase()}`,
-      message: `Your permission request was ${status.toLowerCase()} by ${req.user.name}.`,
-      type: "permission",
-      createdBy: req.user._id
+    await createDecisionNotifications({
+      request: permission,
+      actor: req.user,
+      status,
+      type: "permission"
     });
 
-    const populated = await PermissionRequest.findById(permission._id)
-      .populate("employee", employeeFields)
-      .populate("approvedBy", "name role");
+    const populated = await populateRequestQuery(PermissionRequest.findById(permission._id));
 
     res.json({
       permission: populated,

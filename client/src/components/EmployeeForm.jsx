@@ -1,10 +1,11 @@
+import { Eye, EyeOff } from "lucide-react";
 import { useMemo, useState } from "react";
 import Button from "./Button";
 import FileUploadField from "./FileUploadField";
 import UserAvatar from "./UserAvatar";
 
 const departments = ["Production", "Quality", "Maintenance", "Stores", "Administration", "HR", "Finance"];
-const roles = ["employee", "hr", "admin"];
+const roles = ["employee", "hr", "admin", "dri"];
 const shifts = ["", "1st Shift", "2nd Shift", "3rd Shift", "General Shift"];
 
 export default function EmployeeForm({ initialValue, isEdit = false, onSubmit }) {
@@ -20,7 +21,7 @@ export default function EmployeeForm({ initialValue, isEdit = false, onSubmit })
       joiningDate: "",
       address: "",
       emergencyContact: "",
-      password: "Welcome@123",
+      password: "",
       role: "employee",
       profilePhoto: ""
     }),
@@ -28,6 +29,7 @@ export default function EmployeeForm({ initialValue, isEdit = false, onSubmit })
   );
   const [form, setForm] = useState({ ...defaults, ...initialValue });
   const [saving, setSaving] = useState(false);
+  const [showPassword, setShowPassword] = useState(false);
 
   const update = (field) => (event) => setForm((current) => ({ ...current, [field]: event.target.value }));
 
@@ -123,14 +125,25 @@ export default function EmployeeForm({ initialValue, isEdit = false, onSubmit })
         </div>
         <label className="space-y-1 md:col-span-2">
           <span className="form-label">{isEdit ? "New Password" : "Password"}</span>
-          <input
-            className="form-input"
-            minLength={6}
-            type="password"
-            value={form.password || ""}
-            onChange={update("password")}
-            required={!isEdit}
-          />
+          <div className="relative">
+            <input
+              autoComplete="new-password"
+              className="form-input pr-12"
+              minLength={6}
+              type={showPassword ? "text" : "password"}
+              value={form.password || ""}
+              onChange={update("password")}
+              required={!isEdit}
+            />
+            <button
+              className="absolute right-2 top-1/2 grid h-8 w-8 -translate-y-1/2 place-items-center rounded-lg text-slate-500 transition hover:bg-slate-100 hover:text-slate-900"
+              type="button"
+              onClick={() => setShowPassword((current) => !current)}
+              aria-label={showPassword ? "Hide password" : "Show password"}
+            >
+              {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+            </button>
+          </div>
         </label>
       </div>
       <div className="mt-5 flex justify-end">

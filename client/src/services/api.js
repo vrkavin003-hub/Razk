@@ -31,11 +31,16 @@ api.interceptors.response.use(
 
     const serverMessage = error.response?.data?.message;
     const validationMessage = error.response?.data?.errors?.[0]?.message;
+    const statusMessage = error.response?.status
+      ? `The HYA Tech API responded with ${error.response.status}.`
+      : "";
     const fallbackMessage = error.code === "ECONNABORTED"
       ? "The server took too long to respond. Please try again."
-      : error.request
-        ? `Unable to reach the HYA Tech API at ${API_BASE_URL}. ${apiConfigurationWarning || "Check the backend URL and network connection."}`
-        : error.message;
+      : error.response
+        ? statusMessage || error.message
+        : error.request
+          ? `Unable to reach the HYA Tech API at ${API_BASE_URL}. ${apiConfigurationWarning || "Check the backend URL and network connection."}`
+          : error.message;
 
     return Promise.reject(new Error(serverMessage || validationMessage || fallbackMessage || "Request failed"));
   }

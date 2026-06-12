@@ -23,7 +23,7 @@ const reportDefinitions = {
   },
   attendance: {
     title: "Location Attendance Report",
-    sql: `SELECT id, employee_id, date, check_in_time, check_out_time,
+    sql: `SELECT id, employee_id, date, check_in_time, check_out_time, shift_name,
                  check_in_latitude, check_in_longitude, check_in_accuracy, check_in_location_status,
                  check_out_latitude, check_out_longitude, check_out_accuracy, check_out_location_status,
                  work_duration, status, created_at
@@ -34,6 +34,7 @@ const reportDefinitions = {
       "date",
       "check_in_time",
       "check_out_time",
+      "shift_name",
       "check_in_latitude",
       "check_in_longitude",
       "check_in_accuracy",
