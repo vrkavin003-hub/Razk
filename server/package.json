@@ -8,7 +8,7 @@
   },
   "scripts": {
     "dev": "nodemon server.js",
-    "start": "node server.js",
+    "start": "node scripts/renderStart.js",
     "db:sqlserver:schema": "node scripts/runSqlServerSchema.js",
     "seed": "node scripts/seedAdmin.js",
     "seed:sql": "node sql/seedAdminSql.js"
