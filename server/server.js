@@ -9,6 +9,7 @@ const mongoose = require("mongoose");
 const connectDB = require("./config/db");
 const {
   getEnvironmentStatus,
+  isAllowedClientOrigin,
   getStartupConfig,
   validateStartupConfiguration
 } = require("./config/runtime");
@@ -76,8 +77,7 @@ app.use(
 
       const isLocalDevOrigin = /^http:\/\/(localhost|127\.0\.0\.1):\d+$/.test(origin);
       if (
-        startupConfig.allowedClientOrigins.includes(origin) ||
-        startupConfig.mobileWebViewOrigins.includes(origin) ||
+        isAllowedClientOrigin(origin, startupConfig) ||
         (process.env.NODE_ENV !== "production" && isLocalDevOrigin)
       ) {
         callback(null, true);

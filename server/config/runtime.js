@@ -25,6 +25,23 @@ const getAllowedClientOrigins = () => {
   return origins.length ? origins : [DEFAULT_CLIENT_ORIGIN];
 };
 
+const isAllowedVercelPreviewOrigin = (origin) => {
+  try {
+    const { hostname, protocol } = new URL(origin);
+    return (
+      protocol === "https:" &&
+      (hostname === "razk.vercel.app" || /^razk-[a-z0-9-]+-kavin-v-projects\.vercel\.app$/.test(hostname))
+    );
+  } catch {
+    return false;
+  }
+};
+
+const isAllowedClientOrigin = (origin, startupConfig) =>
+  startupConfig.allowedClientOrigins.includes(origin) ||
+  startupConfig.mobileWebViewOrigins.includes(origin) ||
+  isAllowedVercelPreviewOrigin(origin);
+
 const getStartupConfig = () => {
   const databaseMode = getDatabaseMode();
   return {
@@ -91,6 +108,7 @@ const validateStartupConfiguration = (startupConfig) => {
 };
 
 module.exports = {
+  isAllowedClientOrigin,
   getAllowedClientOrigins,
   getDatabaseMode,
   getEnvironmentStatus,
