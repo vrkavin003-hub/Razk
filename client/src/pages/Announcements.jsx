@@ -46,6 +46,17 @@ export default function Announcements() {
     }
   };
 
+  const removeAnnouncement = async (announcement) => {
+    if (!window.confirm(`Delete announcement "${announcement.title}"?`)) return;
+    try {
+      await api.delete(`/announcements/${announcement._id}`);
+      toast.success("Announcement deleted");
+      await load();
+    } catch (error) {
+      toast.error(error.message);
+    }
+  };
+
   if (!announcements) return <Loading />;
 
   return (
@@ -80,7 +91,11 @@ export default function Announcements() {
       ) : null}
       <section className="grid gap-4 lg:grid-cols-2">
         {announcements.map((announcement) => (
-          <AnnouncementCard announcement={announcement} key={announcement._id} />
+          <AnnouncementCard
+            announcement={announcement}
+            key={announcement._id}
+            onDelete={isManager ? removeAnnouncement : undefined}
+          />
         ))}
       </section>
       {!announcements.length ? <EmptyState title="No announcements" /> : null}

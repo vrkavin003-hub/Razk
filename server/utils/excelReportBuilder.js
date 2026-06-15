@@ -144,7 +144,7 @@ const addEmployeeReportSheet = (workbook, report) => {
   });
   sheet.views = [{ state: "frozen", ySplit: 11 }];
   setColumnWidths(sheet, [14, 11, 14, 14, 18, 15, 18, 24, 24, 12, 14, 34]);
-  addHeader(workbook, sheet, report, "L");
+  addHeader(workbook, sheet, report, "M");
 
   let nextRow = addKeyValueRows(sheet, 5, "Employee Details", [
     ["Employee ID", report.employee?.employeeId, "Name", report.employee?.name],
@@ -208,7 +208,7 @@ const addSummaryReportSheet = (workbook, report) => {
     pageSetup: { orientation: "landscape", fitToPage: true, fitToWidth: 1, fitToHeight: 0 }
   });
   sheet.views = [{ state: "frozen", ySplit: 9 }];
-  setColumnWidths(sheet, [8, 16, 24, 18, 20, 10, 10, 10, 10, 10, 14, 14]);
+  setColumnWidths(sheet, [8, 16, 24, 18, 20, 10, 10, 10, 10, 10, 10, 14, 14]);
   addHeader(workbook, sheet, report, "L");
 
   let nextRow = addKeyValueRows(sheet, 5, "Report Details", [
@@ -228,6 +228,7 @@ const addSummaryReportSheet = (workbook, report) => {
     "Late",
     "Half Day",
     "Leave",
+    "Week Off",
     "Hours",
     "Attendance %"
   ];
@@ -246,6 +247,7 @@ const addSummaryReportSheet = (workbook, report) => {
       item.summary?.late || 0,
       item.summary?.halfDay || 0,
       item.summary?.leave || 0,
+      item.summary?.weekOff || 0,
       item.summary?.totalWorkingHours || 0,
       `${item.summary?.attendancePercentage ?? "-"}%`
     ];
@@ -253,7 +255,7 @@ const addSummaryReportSheet = (workbook, report) => {
   });
 
   const legendRow = nextRow + 3 + report.rows.length;
-  sheet.mergeCells(`A${legendRow}:L${legendRow}`);
+  sheet.mergeCells(`A${legendRow}:M${legendRow}`);
   sheet.getCell(`A${legendRow}`).value = "Legend: P - Present | A - Absent | L - Late | HD - Half Day | LV - Leave | OD - On Duty | WO - Week Off";
   sheet.getCell(`A${legendRow}`).font = { bold: true, color: { argb: "FF475569" } };
 

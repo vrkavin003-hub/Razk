@@ -29,6 +29,7 @@ const normalizeUser = (user) => ({
   department: user.department,
   designation: user.designation,
   assignedShift: user.assignedShift,
+  weeklyWeekOffDay: user.weeklyWeekOffDay,
   joiningDate: user.joiningDate,
   role: user.role
 });

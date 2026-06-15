@@ -45,6 +45,11 @@ const userSchema = new mongoose.Schema(
       enum: ["", "1st Shift", "2nd Shift", "3rd Shift", "General Shift"],
       default: ""
     },
+    weeklyWeekOffDay: {
+      type: String,
+      enum: ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"],
+      default: "Sunday"
+    },
     phone: {
       type: String,
       trim: true

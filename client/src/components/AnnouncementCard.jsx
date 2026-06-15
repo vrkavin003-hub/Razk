@@ -1,15 +1,23 @@
-import { Megaphone } from "lucide-react";
+import { Megaphone, Trash2 } from "lucide-react";
+import Button from "./Button";
 import DateTimeDisplay from "./DateTimeDisplay";
 
-export default function AnnouncementCard({ announcement }) {
+export default function AnnouncementCard({ announcement, onDelete }) {
   return (
     <article className="panel p-5 transition duration-200 hover:-translate-y-0.5 hover:shadow-lg hover:shadow-slate-900/10 dark:hover:shadow-none">
       <div className="flex items-start gap-3">
         <span className="rounded-lg bg-slate-100 p-3 text-slate-900 ring-1 ring-slate-200 dark:bg-slate-800 dark:text-slate-100 dark:ring-slate-700">
           <Megaphone className="h-5 w-5" aria-hidden="true" />
         </span>
-        <div className="min-w-0">
-          <p className="text-base font-black text-slate-950 dark:text-slate-100">{announcement.title}</p>
+        <div className="min-w-0 flex-1">
+          <div className="flex items-start justify-between gap-3">
+            <p className="text-base font-black text-slate-950 dark:text-slate-100">{announcement.title}</p>
+            {onDelete ? (
+              <Button aria-label={`Delete ${announcement.title}`} icon={Trash2} onClick={() => onDelete(announcement)} size="sm" variant="danger">
+                Delete
+              </Button>
+            ) : null}
+          </div>
           <p className="mt-1 text-xs font-bold uppercase tracking-wide text-slate-500 dark:text-slate-300">
             {announcement.targetRole} | <DateTimeDisplay value={announcement.createdAt} />
           </p>

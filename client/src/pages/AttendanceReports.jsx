@@ -9,6 +9,7 @@ import PageHeader from "../components/PageHeader";
 import StatCard from "../components/StatCard";
 import StatusBadge from "../components/StatusBadge";
 import api from "../services/api";
+import { saveReportFile } from "../utils/downloadFile";
 import { formatDate, formatTime } from "../utils/formatters";
 import { attendanceShift } from "../utils/shifts";
 
@@ -127,12 +128,11 @@ export default function AttendanceReports() {
         params: endpoint.params,
         responseType: "blob"
       });
-      const url = window.URL.createObjectURL(response.data);
-      const link = document.createElement("a");
-      link.href = url;
-      link.download = `${filters.type}-attendance-report.pdf`;
-      link.click();
-      window.URL.revokeObjectURL(url);
+      await saveReportFile({
+        blob: response.data,
+        filename: `${filters.type}-attendance-report.pdf`,
+        mimeType: "application/pdf"
+      });
     } catch (error) {
       toast.error(error.message);
     }
@@ -151,12 +151,11 @@ export default function AttendanceReports() {
         params: endpoint.params,
         responseType: "blob"
       });
-      const url = window.URL.createObjectURL(response.data);
-      const link = document.createElement("a");
-      link.href = url;
-      link.download = `${filters.type}-attendance-report.xlsx`;
-      link.click();
-      window.URL.revokeObjectURL(url);
+      await saveReportFile({
+        blob: response.data,
+        filename: `${filters.type}-attendance-report.xlsx`,
+        mimeType: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+      });
     } catch (error) {
       toast.error(error.message);
     }
@@ -381,6 +380,7 @@ function ReportTable({ report }) {
             <th className="px-4 py-3">Late</th>
             <th className="px-4 py-3">Half Day</th>
             <th className="px-4 py-3">Leave</th>
+            <th className="px-4 py-3">Week Off</th>
             <th className="px-4 py-3">Hours</th>
             <th className="px-4 py-3">Attendance %</th>
           </tr>
@@ -398,6 +398,7 @@ function ReportTable({ report }) {
               <td className="table-cell">{row.summary.late}</td>
               <td className="table-cell">{row.summary.halfDay}</td>
               <td className="table-cell">{row.summary.leave}</td>
+              <td className="table-cell">{row.summary.weekOff}</td>
               <td className="table-cell">{row.summary.totalWorkingHours}</td>
               <td className="table-cell">{row.summary.attendancePercentage}%</td>
             </tr>

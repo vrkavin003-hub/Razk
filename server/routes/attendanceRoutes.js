@@ -6,7 +6,8 @@ const {
   getAllAttendance,
   getMyHistory,
   getReport,
-  getTodayAttendance
+  getTodayAttendance,
+  markWeekOff
 } = require("../controllers/attendanceController");
 const { authorize, protect } = require("../middleware/authMiddleware");
 
@@ -15,6 +16,7 @@ const router = express.Router();
 router.use(protect);
 router.post("/check-in", authorize("employee", "hr", "admin", "dri"), checkIn);
 router.post("/check-out", authorize("employee", "hr", "admin", "dri"), checkOut);
+router.post("/week-off", authorize("admin", "hr"), markWeekOff);
 router.get("/today", getTodayAttendance);
 router.get("/my-attendance", getMyHistory);
 router.get("/my-history", getMyHistory);

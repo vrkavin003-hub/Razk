@@ -6,6 +6,7 @@ const PermissionRequest = require("../models/PermissionRequest");
 const User = require("../models/User");
 const asyncHandler = require("../utils/asyncHandler");
 const { daysBetweenInclusive, toDateKey } = require("../utils/dates");
+const { isAssignedWeekOffDate } = require("../utils/weekOff");
 const { leaveBalanceForEmployee } = require("./leaveController");
 const { permissionBalanceForEmployee } = require("./permissionController");
 
@@ -36,9 +37,11 @@ const buildOrgDashboard = async () => {
     "employee",
     "department role isActive"
   );
-  const presentToday = todayAttendance.length;
+  const presentStatuses = ["Present", "Late", "Half Day", "OD"];
+  const presentToday = todayAttendance.filter((item) => presentStatuses.includes(item.status)).length;
   const lateToday = todayAttendance.filter((item) => item.status === "Late").length;
-  const absentToday = Math.max(totalEmployees - presentToday, 0);
+  const weekOffToday = activeEmployees.filter((employee) => isAssignedWeekOffDate(employee, today)).length;
+  const absentToday = Math.max(totalEmployees - presentToday - weekOffToday, 0);
   const pendingLeaveRequests = await LeaveRequest.countDocuments({ status: "Pending" });
   const pendingPermissionRequests = await PermissionRequest.countDocuments({ status: "Pending" });
   const pendingODRequests = await ODRequest.countDocuments({ status: "Pending" });
@@ -49,7 +52,7 @@ const buildOrgDashboard = async () => {
     const records = todayAttendance.filter((record) => record.date === date);
     return {
       date,
-      present: records.length,
+      present: records.filter((record) => presentStatuses.includes(record.status)).length,
       late: records.filter((record) => record.status === "Late").length,
       absent: date === today ? absentToday : 0
     };
@@ -59,7 +62,7 @@ const buildOrgDashboard = async () => {
     const weekRecords = await Attendance.find({ date: { $in: dateKeys } });
     weeklyAttendance.forEach((row) => {
       const records = weekRecords.filter((record) => record.date === row.date);
-      row.present = records.length;
+      row.present = records.filter((record) => presentStatuses.includes(record.status)).length;
       row.late = records.filter((record) => record.status === "Late").length;
       row.absent = row.date === today ? absentToday : 0;
     });
@@ -67,12 +70,15 @@ const buildOrgDashboard = async () => {
 
   const departmentAttendance = departments.map((department) => {
     const departmentEmployees = activeEmployees.filter((employee) => employee.department === department);
-    const present = todayAttendance.filter((record) => record.employee?.department === department).length;
+    const departmentWeekOff = departmentEmployees.filter((employee) => isAssignedWeekOffDate(employee, today)).length;
+    const present = todayAttendance.filter(
+      (record) => record.employee?.department === department && presentStatuses.includes(record.status)
+    ).length;
     return {
       department,
       total: departmentEmployees.length,
       present,
-      absent: Math.max(departmentEmployees.length - present, 0)
+      absent: Math.max(departmentEmployees.length - present - departmentWeekOff, 0)
     };
   });
 
@@ -127,9 +133,24 @@ const employeeDashboard = asyncHandler(async (req, res) => {
   const leaveBalance = await leaveBalanceForEmployee(req.user._id);
   const permissionBalance = await permissionBalanceForEmployee(req.user._id);
 
+  const virtualWeekOff =
+    !attendance && isAssignedWeekOffDate(req.user, today)
+      ? {
+          _id: `week-off-${req.user._id}-${today}`,
+          employee: req.user._id,
+          employeeId: req.user.employeeId || String(req.user._id),
+          date: today,
+          status: "Week Off",
+          shiftName: "Weekly Week Off",
+          workingHours: 0,
+          remarks: `Assigned ${req.user.weeklyWeekOffDay || "Week Off"}`,
+          isVirtualWeekOff: true
+        }
+      : null;
+
   res.json({
-    todayStatus: attendance?.status || "Absent",
-    attendance,
+    todayStatus: attendance?.status || virtualWeekOff?.status || "Absent",
+    attendance: attendance || virtualWeekOff,
     workingHoursToday: attendance?.workingHours || 0,
     leaveBalance: leaveBalance.remaining,
     leaveBalanceDetails: leaveBalance,

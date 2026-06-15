@@ -48,11 +48,17 @@ const attendanceSchema = new mongoose.Schema(
     },
     status: {
       type: String,
-      enum: ["Present", "Absent", "Half Day", "Late", "OD"],
+      enum: ["Present", "Absent", "Half Day", "Late", "OD", "Leave", "Missed", "Week Off"],
       default: "Present"
     },
     locationNote: String,
-    remarks: String
+    remarks: String,
+    statusUpdatedBy: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "User"
+    },
+    statusUpdatedAt: Date,
+    statusUpdateReason: String
   },
   { timestamps: true }
 );

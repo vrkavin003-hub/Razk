@@ -7,6 +7,7 @@ import UserAvatar from "./UserAvatar";
 const departments = ["Production", "Quality", "Maintenance", "Stores", "Administration", "HR", "Finance"];
 const roles = ["employee", "hr", "admin", "dri"];
 const shifts = ["", "1st Shift", "2nd Shift", "3rd Shift", "General Shift"];
+const weekDays = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
 
 export default function EmployeeForm({ initialValue, isEdit = false, onSubmit }) {
   const defaults = useMemo(
@@ -18,6 +19,7 @@ export default function EmployeeForm({ initialValue, isEdit = false, onSubmit })
       department: "Production",
       designation: "",
       assignedShift: "",
+      weeklyWeekOffDay: "Sunday",
       joiningDate: "",
       address: "",
       emergencyContact: "",
@@ -82,6 +84,16 @@ export default function EmployeeForm({ initialValue, isEdit = false, onSubmit })
             {shifts.map((shift) => (
               <option key={shift || "auto"} value={shift}>
                 {shift || "Auto by check-in time"}
+              </option>
+            ))}
+          </select>
+        </label>
+        <label className="space-y-1">
+          <span className="form-label">Weekly Week Off</span>
+          <select className="form-input" value={form.weeklyWeekOffDay || "Sunday"} onChange={update("weeklyWeekOffDay")}>
+            {weekDays.map((day) => (
+              <option key={day} value={day}>
+                {day}
               </option>
             ))}
           </select>

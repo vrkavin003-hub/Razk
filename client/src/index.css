@@ -12,8 +12,9 @@
     min-width: 320px;
     min-height: 100vh;
     min-height: 100dvh;
-    background: #f8fafc;
-    color: #0f172a;
+    background:
+      linear-gradient(180deg, #f7f9fc 0%, #eef3f7 100%);
+    color: #142033;
     font-family:
       Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
     -webkit-font-smoothing: antialiased;
@@ -21,8 +22,8 @@
   }
 
   html.dark body {
-    background: #050505;
-    color: #f8fafc;
+    background: #07111f;
+    color: #dce8f8;
   }
 
   input,
@@ -43,38 +44,38 @@
   }
 
   ::selection {
-    background: rgba(15, 23, 42, 0.12);
+    background: rgb(37 99 235 / 0.16);
     color: #0f172a;
   }
 }
 
 @layer components {
   .form-label {
-    @apply text-sm font-semibold text-slate-700 dark:text-slate-200;
+    @apply text-sm font-semibold text-slate-700 dark:text-blue-100;
   }
 
   .form-input {
-    @apply w-full rounded-lg border border-slate-300 bg-white px-3.5 py-2.5 text-sm text-slate-900 outline-none transition placeholder:text-slate-400 focus:border-slate-900 focus:ring-4 focus:ring-slate-200 disabled:cursor-not-allowed disabled:bg-slate-50 disabled:text-slate-500 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100 dark:placeholder:text-slate-500 dark:focus:border-slate-400 dark:focus:ring-slate-800;
+    @apply w-full rounded-lg border border-slate-200 bg-white px-3.5 py-2.5 text-sm text-slate-900 outline-none transition placeholder:text-slate-400 focus:border-hya-500 focus:ring-4 focus:ring-hya-100 disabled:cursor-not-allowed disabled:bg-slate-50 disabled:text-slate-500 dark:border-[#203e6f] dark:bg-[#0c1f3d] dark:text-blue-50 dark:placeholder:text-blue-300 dark:focus:border-blue-400 dark:focus:ring-blue-950;
   }
 
   .panel {
-    @apply rounded-lg border border-slate-200 bg-white shadow-panel ring-1 ring-white/70 dark:border-slate-700 dark:bg-slate-950 dark:ring-black/20 dark:shadow-none;
+    @apply rounded-lg border border-slate-200 bg-white shadow-panel ring-1 ring-white/70 dark:border-[#203e6f] dark:bg-[#0c1f3d] dark:ring-white/5 dark:shadow-none;
   }
 
   .table-head {
-    @apply bg-slate-100 text-left text-xs font-bold uppercase tracking-wide text-slate-500 dark:bg-slate-900 dark:text-slate-300;
+    @apply bg-slate-50 text-left text-xs font-bold uppercase tracking-wide text-slate-500 dark:bg-[#09192e] dark:text-blue-200;
   }
 
   .table-cell {
-    @apply border-t border-slate-200 px-4 py-3 align-top text-sm text-slate-700 transition-colors dark:border-slate-700 dark:text-slate-300;
+    @apply border-t border-slate-100 px-4 py-3 align-top text-sm text-slate-700 transition-colors dark:border-[#203e6f] dark:text-blue-100;
   }
 
   .theme-logo-tile {
-    @apply bg-white ring-slate-200 dark:bg-slate-900 dark:ring-slate-700;
+    @apply bg-white ring-slate-200;
   }
 
   .surface-muted {
-    @apply rounded-lg border border-slate-200 bg-slate-50 dark:border-slate-700 dark:bg-slate-950;
+    @apply rounded-lg border border-slate-200 bg-slate-50 dark:border-[#203e6f] dark:bg-[#09192e];
   }
 }
 
@@ -82,20 +83,20 @@
   .theme-light,
   .theme-dark,
   html.dark {
-    --surface-dark-bg: #050505;
-    --surface-dark-shell: #111111;
-    --surface-dark-panel: #121212;
-    --surface-dark-panel-strong: #1f1f1f;
-    --surface-dark-active: #27272a;
-    --surface-dark-border: #334155;
-    --surface-dark-text: #cbd5e1;
-    --surface-dark-text-strong: #f8fafc;
-    --surface-dark-text-muted: #94a3b8;
+    --surface-dark-bg: #07111f;
+    --surface-dark-shell: #09192e;
+    --surface-dark-panel: #0c1f3d;
+    --surface-dark-panel-strong: #123052;
+    --surface-dark-active: #123b66;
+    --surface-dark-border: #203e6f;
+    --surface-dark-text: #dce8f8;
+    --surface-dark-text-strong: #f8fbff;
+    --surface-dark-text-muted: #9bb8df;
   }
 
   .theme-light {
-    background-color: #f8fafc !important;
-    color: #0f172a !important;
+    background-color: #f5f7fb !important;
+    color: #142033 !important;
   }
 
   .theme-light header,
@@ -103,7 +104,6 @@
   .theme-light [class~="bg-white"],
   .theme-light [class~="bg-white/90"] {
     background-color: #ffffff !important;
-    color: #0f172a !important;
     border-color: #e2e8f0 !important;
   }
 
@@ -116,31 +116,53 @@
   }
 
   .theme-light [class~="bg-slate-300"] {
-    background-color: #e2e8f0 !important;
+    background-color: #cbd5e1 !important;
+  }
+
+  .theme-light [class~="bg-hya-50"],
+  .theme-light [class~="bg-hya-50/60"],
+  .theme-light [class~="bg-blue-950"] {
+    background-color: #eff6ff !important;
+  }
+
+  .theme-light [class~="bg-emerald-950"] {
+    background-color: #ecfdf5 !important;
+  }
+
+  .theme-light [class~="bg-amber-950"] {
+    background-color: #fffbeb !important;
+  }
+
+  .theme-light [class~="bg-rose-950"] {
+    background-color: #fff1f2 !important;
+  }
+
+  .theme-light [class~="bg-indigo-950"] {
+    background-color: #eef2ff !important;
   }
 
   .theme-light [class~="border-slate-100"] {
-    border-color: #e2e8f0 !important;
+    border-color: #f1f5f9 !important;
   }
 
   .theme-light [class~="border-slate-200"],
   .theme-light [class~="border-slate-300"],
   .theme-light [class~="border-dashed"] {
-    border-color: #cbd5e1 !important;
+    border-color: #e2e8f0 !important;
   }
 
   .theme-light [class~="ring-slate-200"] {
-    --tw-ring-color: #cbd5e1 !important;
+    --tw-ring-color: #e2e8f0 !important;
   }
 
   .theme-light [class~="text-slate-950"],
   .theme-light [class~="text-slate-900"] {
-    color: #0f172a !important;
+    color: #020617 !important;
   }
 
   .theme-light [class~="text-slate-700"],
   .theme-light [class~="text-slate-600"] {
-    color: #475569 !important;
+    color: #334155 !important;
   }
 
   .theme-light [class~="text-slate-500"],
@@ -148,34 +170,55 @@
     color: #64748b !important;
   }
 
+  .theme-light [class~="text-hya-700"],
+  .theme-light [class~="text-blue-200"] {
+    color: #1e40af !important;
+  }
+
+  .theme-light [class~="text-emerald-200"] {
+    color: #047857 !important;
+  }
+
+  .theme-light [class~="text-amber-200"] {
+    color: #b45309 !important;
+  }
+
+  .theme-light [class~="text-rose-200"] {
+    color: #be123c !important;
+  }
+
+  .theme-light [class~="text-indigo-200"] {
+    color: #4338ca !important;
+  }
+
   .theme-light input,
   .theme-light select,
   .theme-light textarea {
     background-color: #ffffff !important;
-    border-color: #cbd5e1 !important;
+    border-color: #e2e8f0 !important;
     color: #0f172a !important;
   }
 
   .theme-light .panel {
     background-color: #ffffff !important;
     border-color: #e2e8f0 !important;
-    color: #0f172a !important;
-    box-shadow: 0 18px 48px rgba(15, 23, 42, 0.08) !important;
+    color: #142033 !important;
+    box-shadow: 0 18px 48px rgb(15 23 42 / 0.08) !important;
   }
 
   .theme-light .table-head {
-    background-color: #f1f5f9 !important;
-    color: #475569 !important;
+    background-color: #f8fafc !important;
+    color: #64748b !important;
   }
 
   .theme-light .table-cell {
-    border-color: #e2e8f0 !important;
-    color: #475569 !important;
+    border-color: #f1f5f9 !important;
+    color: #334155 !important;
   }
 
   .theme-dark {
     background-color: var(--surface-dark-bg) !important;
-    color: var(--surface-dark-text-strong) !important;
+    color: var(--surface-dark-text) !important;
   }
 
   html.dark,
@@ -183,7 +226,7 @@
   html.dark #root,
   .theme-dark {
     background-color: var(--surface-dark-bg);
-    color: var(--surface-dark-text-strong);
+    color: var(--surface-dark-text);
   }
 
   .theme-dark [class~="bg-slate-50"] {
@@ -202,6 +245,11 @@
   .theme-dark [class~="bg-slate-300"],
   .theme-dark [class~="hover:bg-slate-50"]:hover {
     background-color: var(--surface-dark-panel-strong) !important;
+  }
+
+  .theme-dark [class~="bg-hya-50"],
+  .theme-dark [class~="bg-hya-50/60"] {
+    background-color: var(--surface-dark-active) !important;
   }
 
   .theme-dark [class~="border-slate-100"],
@@ -234,7 +282,7 @@
 
   .theme-dark .panel,
   .theme-dark [class~="shadow-panel"] {
-    box-shadow: 0 18px 50px rgba(0, 0, 0, 0.28) !important;
+    box-shadow: 0 18px 50px rgb(0 0 0 / 0.22) !important;
   }
 
   .theme-dark .table-head {
@@ -263,19 +311,19 @@
   .theme-light .theme-logo-tile,
   .theme-dark .theme-logo-tile {
     background-color: #ffffff !important;
-    --tw-ring-color: #cbd5e1 !important;
+    --tw-ring-color: #e2e8f0 !important;
   }
 
   .theme-light tbody tr:hover .table-cell {
-    background-color: #e2e8f0;
+    background-color: #f8fafc;
   }
 
   .theme-dark tbody tr:hover .table-cell {
-    background-color: #111827;
+    background-color: #102a47;
   }
 
   .thin-scrollbar {
-    scrollbar-color: #94a3b8 transparent;
+    scrollbar-color: #cbd5e1 transparent;
     scrollbar-width: thin;
   }
 
@@ -299,4 +347,3 @@
     }
   }
 }
-

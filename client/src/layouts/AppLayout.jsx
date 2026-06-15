@@ -17,7 +17,7 @@ import {
   Users,
   X
 } from "lucide-react";
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { NavLink, Outlet, useLocation, useNavigate } from "react-router-dom";
 import Button from "../components/Button";
 import CompanyLogo from "../components/CompanyLogo";
@@ -76,14 +76,22 @@ export default function AppLayout() {
     permissionUpdateCount: 0
   });
 
-  const items = navItems.filter((item) => roleMatches(user?.role, item.roles));
-  const activeItem = [...items]
-    .sort((a, b) => b.path.length - a.path.length)
-    .find((item) => location.pathname === item.path || location.pathname.startsWith(`${item.path}/`));
+  const items = useMemo(() => navItems.filter((item) => roleMatches(user?.role, item.roles)), [user?.role]);
+  const activeItem = useMemo(
+    () =>
+      [...items]
+        .sort((a, b) => b.path.length - a.path.length)
+        .find((item) => location.pathname === item.path || location.pathname.startsWith(`${item.path}/`)),
+    [items, location.pathname]
+  );
   const roleLabel = user?.role ? user.role.toUpperCase() : "USER";
-  const groupedItems = navSections
-    .map((section) => [section, items.filter((item) => item.section === section)])
-    .filter(([, sectionItems]) => sectionItems.length);
+  const groupedItems = useMemo(
+    () =>
+      navSections
+        .map((section) => [section, items.filter((item) => item.section === section)])
+        .filter(([, sectionItems]) => sectionItems.length),
+    [items]
+  );
 
   const handleLogout = () => {
     logout();
@@ -122,12 +130,12 @@ export default function AppLayout() {
     };
 
     loadCounts();
-    const timer = window.setInterval(loadCounts, 15000);
+    const timer = window.setInterval(loadCounts, 45000);
     return () => {
       isMounted = false;
       window.clearInterval(timer);
     };
-  }, [location.pathname]);
+  }, [user?.role]);
 
   const menuBadge = (path) => {
     const managerRole = roleMatches(user?.role, ["admin", "hr"]);
@@ -168,7 +176,7 @@ export default function AppLayout() {
     <aside className="flex h-full w-72 flex-col border-r border-slate-200 bg-white/95 backdrop-blur dark:border-slate-700 dark:bg-slate-950">
       <div className="flex h-20 items-center gap-3 border-b border-slate-100 px-5 dark:border-slate-700">
         <CompanyLogo />
-        <span className="ml-auto rounded-full bg-slate-100 px-2.5 py-1 text-[11px] font-black uppercase text-slate-900 ring-1 ring-slate-200 dark:bg-slate-800 dark:text-slate-100 dark:ring-slate-700">
+      <span className="ml-auto rounded-full bg-emerald-50 px-2.5 py-1 text-[11px] font-black uppercase text-emerald-700 ring-1 ring-emerald-100 dark:bg-emerald-950 dark:text-emerald-200 dark:ring-emerald-800">
           Live
         </span>
       </div>
@@ -186,20 +194,20 @@ export default function AppLayout() {
                     className={({ isActive }) =>
                       `group relative flex min-h-11 items-center gap-3 rounded-lg px-3 text-sm font-bold transition duration-200 ${
                         isActive
-                          ? "bg-slate-100 text-slate-950 ring-1 ring-slate-200 dark:bg-slate-800 dark:text-slate-100 dark:ring-slate-700"
-                          : "text-slate-600 hover:bg-slate-50 hover:text-slate-950 dark:text-slate-300 dark:hover:bg-slate-800 dark:hover:text-slate-100"
+                          ? "bg-hya-50 text-hya-700 ring-1 ring-hya-100 dark:bg-[#123b66] dark:text-blue-50 dark:ring-[#24456f]"
+                          : "text-slate-600 hover:bg-slate-50 hover:text-slate-950 dark:text-blue-200 dark:hover:bg-[#123052] dark:hover:text-blue-50"
                       }`
                     }
                     key={`${item.path}-${item.label}`}
                     onClick={() => setOpen(false)}
                     to={item.path}
                   >
-                    <span className="grid h-8 w-8 place-items-center rounded-lg bg-white text-slate-500 ring-1 ring-slate-200 transition group-hover:text-slate-900 dark:bg-slate-800 dark:text-slate-100 dark:ring-slate-700">
+                    <span className="grid h-8 w-8 place-items-center rounded-lg bg-white text-slate-500 ring-1 ring-slate-200 transition group-hover:text-hya-700 dark:bg-[#0c1f3d] dark:text-blue-200 dark:ring-[#24456f]">
                       <Icon className="h-4 w-4" aria-hidden="true" />
                     </span>
                     <span className="min-w-0 flex-1 truncate">{menuLabel(item)}</span>
                     {menuBadge(item.path) ? (
-                      <span className="grid min-h-5 min-w-5 place-items-center rounded-full bg-slate-900 px-1.5 text-xs font-black text-white dark:bg-slate-100 dark:text-slate-950">
+                      <span className="grid min-h-5 min-w-5 place-items-center rounded-full bg-amber-500 px-1.5 text-xs font-black text-white dark:bg-amber-400 dark:text-blue-950">
                         {menuBadge(item.path) > 9 ? "9+" : menuBadge(item.path)}
                       </span>
                     ) : null}
@@ -225,7 +233,7 @@ export default function AppLayout() {
             <span className="rounded-full bg-white px-2.5 py-1 font-black text-slate-600 ring-1 ring-slate-200 dark:bg-slate-800 dark:text-slate-100 dark:ring-slate-700">
               {roleLabel}
             </span>
-            <span className="inline-flex items-center gap-1 font-bold text-slate-900 dark:text-slate-100">
+            <span className="inline-flex items-center gap-1 font-bold text-emerald-700 dark:text-emerald-200">
               <Activity className="h-3.5 w-3.5" aria-hidden="true" />
               Active
             </span>
@@ -240,7 +248,7 @@ export default function AppLayout() {
 
   return (
     <div
-      className={`theme-${theme} min-h-mobile bg-slate-50 text-slate-900 dark:bg-slate-950 dark:text-slate-100`}
+      className={`theme-${theme} min-h-mobile bg-slate-50 text-slate-900 dark:bg-hya-950 dark:text-blue-50`}
       data-theme={theme}
     >
       <div className="hidden md:fixed md:inset-y-0 md:flex">{sidebar}</div>

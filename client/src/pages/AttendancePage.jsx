@@ -1,4 +1,4 @@
-import { ExternalLink, Filter, LogIn, LogOut, MapPin, Navigation, RefreshCcw } from "lucide-react";
+import { CalendarX, ExternalLink, Filter, LogIn, LogOut, MapPin, Navigation, RefreshCcw } from "lucide-react";
 import { useEffect, useState } from "react";
 import toast from "react-hot-toast";
 import Button from "../components/Button";
@@ -16,6 +16,7 @@ import { roleMatches } from "../utils/formatters";
 import { attendanceShift } from "../utils/shifts";
 
 const locationUnavailableMessage = "Attendance marked, but location could not be captured.";
+const weekOffEditableStatuses = ["Absent", "Leave", "Missed"];
 
 export default function AttendancePage() {
   const { user } = useAuth();
@@ -46,7 +47,13 @@ export default function AttendancePage() {
         api.get("/attendance/my-history")
       ]);
       setToday(todayData.attendance);
-      setRecords(historyData.attendance);
+      const history = historyData.attendance || [];
+      const todayRecord = todayData.attendance;
+      setRecords(
+        todayRecord?.isVirtualWeekOff && !history.some((record) => record.date === todayRecord.date)
+          ? [todayRecord, ...history]
+          : history
+      );
     }
   };
 
@@ -88,6 +95,29 @@ export default function AttendancePage() {
     }
   };
 
+  const markWeekOff = async ({ employeeId = filters.employeeId, date = filters.date } = {}) => {
+    if (!employeeId || !date) {
+      toast.error("Select employee ID and date to mark Week Off");
+      return;
+    }
+    if (!window.confirm(`Mark ${date} as Week Off for ${employeeId}?`)) return;
+
+    try {
+      await api.post("/attendance/week-off", {
+        employeeId,
+        date,
+        reason: "Marked from attendance page"
+      });
+      toast.success("Week Off marked successfully");
+      await load();
+    } catch (error) {
+      toast.error(error.message);
+    }
+  };
+
+  const canConvertToWeekOff = (record) => isManager && weekOffEditableStatuses.includes(record.status);
+  const isTodayWeekOff = today?.status === "Week Off";
+
   if (!records) return <Loading />;
 
   return (
@@ -114,7 +144,7 @@ export default function AttendancePage() {
           </div>
           <div className="mt-5 flex flex-wrap gap-3">
             <Button
-              disabled={loadingAction || Boolean(today?.checkIn)}
+              disabled={loadingAction || Boolean(today?.checkIn) || isTodayWeekOff}
               icon={LogIn}
               onClick={() => attendanceAction("/attendance/check-in", "Check-in marked successfully.")}
             >
@@ -123,6 +153,7 @@ export default function AttendancePage() {
             <Button
               disabled={
                 loadingAction ||
+                isTodayWeekOff ||
                 !today?.checkIn ||
                 Boolean(today?.checkOut)
               }
@@ -173,13 +204,16 @@ export default function AttendancePage() {
             </div>
           ) : null}
         </section>
-      ) : (
+      ) : null}
+      {isManager ? (
         <section className="mb-6 panel p-5">
           <div className="mb-4 border-b border-slate-100 pb-4 dark:border-slate-700">
             <h2 className="text-base font-black text-slate-950 dark:text-slate-100">Attendance Filters</h2>
-            <p className="mt-1 text-sm text-slate-500 dark:text-slate-300">Date, department, and employee view controls.</p>
+            <p className="mt-1 text-sm text-slate-500 dark:text-slate-300">
+              Date, department, employee view controls, and safe Week Off updates.
+            </p>
           </div>
-          <div className="grid gap-3 md:grid-cols-4">
+          <div className="grid gap-3 md:grid-cols-5">
             <label className="space-y-1.5">
               <span className="form-label">Date</span>
               <input
@@ -212,9 +246,14 @@ export default function AttendancePage() {
                 Apply
               </Button>
             </div>
+            <div className="flex items-end">
+              <Button className="w-full" icon={CalendarX} onClick={() => markWeekOff()} variant="warning">
+                Mark Week Off
+              </Button>
+            </div>
           </div>
         </section>
-      )}
+      ) : null}
       <section className="panel p-5" id="attendance-records">
         <div className="hidden overflow-x-auto md:block">
           <table className="min-w-full">
@@ -229,6 +268,7 @@ export default function AttendancePage() {
                 <th className="px-4 py-3">Check-Out Location</th>
                 <th className="px-4 py-3">Hours</th>
                 <th className="px-4 py-3">Status</th>
+                {isManager ? <th className="px-4 py-3">Action</th> : null}
                 <th className="px-4 py-3">Updated</th>
                 <th className="px-4 py-3">Remarks</th>
               </tr>
@@ -275,6 +315,22 @@ export default function AttendancePage() {
                   <td className="table-cell">
                     <StatusBadge status={record.status} />
                   </td>
+                  {isManager ? (
+                    <td className="table-cell">
+                      {canConvertToWeekOff(record) ? (
+                        <Button
+                          icon={CalendarX}
+                          onClick={() => markWeekOff({ employeeId: record.employeeId, date: record.date })}
+                          size="sm"
+                          variant="warning"
+                        >
+                          Week Off
+                        </Button>
+                      ) : (
+                        <span className="text-xs font-semibold text-slate-500">Locked</span>
+                      )}
+                    </td>
+                  ) : null}
                   <td className="table-cell">
                     <DateTimeDisplay value={record.updatedAt || record.checkOut || record.checkIn} />
                   </td>
@@ -339,6 +395,17 @@ export default function AttendancePage() {
                   <span className="text-xs font-black uppercase text-slate-500">Hours</span>
                   <span className="font-black text-slate-950">{record.workingHours || 0}</span>
                 </div>
+                {canConvertToWeekOff(record) ? (
+                  <Button
+                    className="w-full"
+                    icon={CalendarX}
+                    onClick={() => markWeekOff({ employeeId: record.employeeId, date: record.date })}
+                    size="sm"
+                    variant="warning"
+                  >
+                    Mark Week Off
+                  </Button>
+                ) : null}
               </div>
             </article>
           ))}

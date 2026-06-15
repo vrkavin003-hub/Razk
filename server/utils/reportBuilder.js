@@ -3,6 +3,7 @@ const path = require("path");
 const PDFDocument = require("pdfkit");
 const { toDateKey } = require("./dates");
 const { getShiftFromCheckIn } = require("./shifts");
+const { isAssignedWeekOffDate, normalizeWeekOffDay } = require("./weekOff");
 
 const logoPath = path.join(__dirname, "..", "assets", "razk-logo.jpeg");
 
@@ -60,8 +61,6 @@ const dayName = (dateKey) =>
     weekday: "short"
   }).format(new Date(`${dateKey}T00:00:00`));
 
-const isSunday = (dateKey) => new Date(`${dateKey}T00:00:00`).getDay() === 0;
-
 const statusCode = (status) => {
   if (status === "Present") return "P";
   if (status === "Late") return "L";
@@ -92,9 +91,9 @@ const buildDailyRecords = ({ employee, attendance, leaves, from, to }) =>
     } else if (leaveRecord) {
       status = "Leave";
       remarks = leaveRecord.leaveType || "Approved leave";
-    } else if (isSunday(dateKey)) {
+    } else if (isAssignedWeekOffDate(employee, dateKey)) {
       status = "Week Off";
-      remarks = "Sunday";
+      remarks = normalizeWeekOffDay(employee?.weeklyWeekOffDay);
     }
 
     return {
@@ -411,6 +410,7 @@ const renderEmployeePdf = (doc, report) => {
       ["Name", report.employee.name],
       ["Department", report.employee.department],
       ["Designation", report.employee.designation],
+      ["Week Off", normalizeWeekOffDay(report.employee.weeklyWeekOffDay)],
       ["Joining Date", report.employee.joiningDate ? formatDate(report.employee.joiningDate) : "-"],
       ["Date Range", `${formatDate(report.from)} to ${formatDate(report.to)}`]
     ],
@@ -471,7 +471,8 @@ const renderSummaryPdf = (doc, report) => {
       { key: "late", label: "L", width: 30 },
       { key: "halfDay", label: "HD", width: 32 },
       { key: "leave", label: "LV", width: 30 },
-      { key: "totalWorkingHours", label: "Hours", width: 44 },
+      { key: "weekOff", label: "WO", width: 32 },
+      { key: "totalWorkingHours", label: "Hours", width: 38 },
       { key: "attendancePercentage", label: "%", width: 32 }
     ],
     report.rows.map((row, index) => ({
@@ -485,6 +486,7 @@ const renderSummaryPdf = (doc, report) => {
       late: row.summary.late,
       halfDay: row.summary.halfDay,
       leave: row.summary.leave,
+      weekOff: row.summary.weekOff,
       totalWorkingHours: row.summary.totalWorkingHours,
       attendancePercentage: row.summary.attendancePercentage
     })),
