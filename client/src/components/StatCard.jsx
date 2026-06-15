@@ -1,24 +1,24 @@
 export default function StatCard({ label, value, icon: Icon, tone = "blue", detail }) {
   const tones = {
     blue: {
-      icon: "bg-sky-100 text-sky-700 ring-sky-200 dark:bg-slate-800 dark:text-slate-100 dark:ring-slate-700",
-      bar: "bg-sky-700"
+      icon: "bg-hya-50 text-hya-700 ring-hya-100 dark:bg-[#123052] dark:text-blue-100 dark:ring-[#24456f]",
+      bar: "bg-hya-600"
     },
     green: {
-      icon: "bg-emerald-100 text-emerald-700 ring-emerald-200 dark:bg-slate-800 dark:text-slate-100 dark:ring-slate-700",
-      bar: "bg-emerald-700"
+      icon: "bg-emerald-50 text-emerald-700 ring-emerald-100 dark:bg-emerald-950 dark:text-emerald-200 dark:ring-emerald-800",
+      bar: "bg-emerald-500 dark:bg-emerald-600"
     },
     amber: {
-      icon: "bg-amber-100 text-amber-700 ring-amber-200 dark:bg-slate-800 dark:text-slate-100 dark:ring-slate-700",
-      bar: "bg-amber-700"
+      icon: "bg-amber-50 text-amber-700 ring-amber-100 dark:bg-amber-950 dark:text-amber-200 dark:ring-amber-800",
+      bar: "bg-amber-500"
     },
     rose: {
-      icon: "bg-rose-100 text-rose-700 ring-rose-200 dark:bg-slate-800 dark:text-slate-100 dark:ring-slate-700",
-      bar: "bg-rose-700"
+      icon: "bg-rose-50 text-rose-700 ring-rose-100 dark:bg-rose-950 dark:text-rose-200 dark:ring-rose-800",
+      bar: "bg-rose-600"
     },
     slate: {
-      icon: "bg-slate-100 text-slate-900 ring-slate-200 dark:bg-slate-800 dark:text-slate-100 dark:ring-slate-700",
-      bar: "bg-slate-900"
+      icon: "bg-slate-100 text-slate-900 ring-slate-200 dark:bg-[#123052] dark:text-blue-100 dark:ring-[#24456f]",
+      bar: "bg-hya-900"
     }
   };
   const toneStyle = tones[tone] || tones.blue;

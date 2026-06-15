@@ -8,12 +8,31 @@ const api = axios.create({
   timeout: 20000
 });
 
+const getSessionToken = () => {
+  try {
+    return sessionStorage.getItem("razk_token");
+  } catch {
+    return null;
+  }
+};
+
+const clearAuthStorage = () => {
+  try {
+    sessionStorage.removeItem("razk_token");
+    sessionStorage.removeItem("razk_user");
+    localStorage.removeItem("razk_token");
+    localStorage.removeItem("razk_user");
+  } catch {
+    // Storage can be blocked in private modes; auth state is cleared by the context event.
+  }
+};
+
 api.interceptors.request.use((config) => {
   if (apiConfigurationWarning) {
     return Promise.reject(new Error(apiConfigurationWarning));
   }
 
-  const token = localStorage.getItem("razk_token");
+  const token = getSessionToken();
   if (token) {
     config.headers.Authorization = `Bearer ${token}`;
   }
@@ -24,8 +43,7 @@ api.interceptors.response.use(
   (response) => response,
   (error) => {
     if (error.response?.status === 401) {
-      localStorage.removeItem("razk_token");
-      localStorage.removeItem("razk_user");
+      clearAuthStorage();
       window.dispatchEvent(new Event("razk:auth-expired"));
     }
 

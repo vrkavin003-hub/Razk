@@ -4,15 +4,19 @@ const asyncHandler = require("../utils/asyncHandler");
 const getNotifications = asyncHandler(async (req, res) => {
   const query = { user: req.user._id };
   if (req.query.type) query.type = req.query.type;
+  if (req.query.includeRead !== "true") query.isRead = false;
 
   const notifications = await Notification.find(query)
     .populate("createdBy", "name role")
     .sort({ createdAt: -1 })
     .limit(Number(req.query.limit) || 50);
 
+  const unreadQuery = { user: req.user._id, isRead: false };
+  if (req.query.type) unreadQuery.type = req.query.type;
+
   res.json({
     notifications,
-    unreadCount: notifications.filter((notification) => !notification.isRead).length
+    unreadCount: await Notification.countDocuments(unreadQuery)
   });
 });
 

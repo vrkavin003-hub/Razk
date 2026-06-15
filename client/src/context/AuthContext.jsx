@@ -2,10 +2,41 @@ import { createContext, useCallback, useContext, useEffect, useMemo, useState } 
 import api from "../services/api";
 
 const AuthContext = createContext(null);
+const TOKEN_KEY = "razk_token";
+const USER_KEY = "razk_user";
+
+const getSessionValue = (key) => {
+  try {
+    return sessionStorage.getItem(key);
+  } catch {
+    return null;
+  }
+};
+
+const setSessionValue = (key, value) => {
+  try {
+    sessionStorage.setItem(key, value);
+  } catch {
+    // Session storage can be unavailable in strict privacy modes.
+  }
+};
+
+const clearAuthStorage = () => {
+  try {
+    sessionStorage.removeItem(TOKEN_KEY);
+    sessionStorage.removeItem(USER_KEY);
+    localStorage.removeItem(TOKEN_KEY);
+    localStorage.removeItem(USER_KEY);
+  } catch {
+    // Storage cleanup is best-effort; React state is still cleared.
+  }
+};
 
 const storedUser = () => {
   try {
-    return JSON.parse(localStorage.getItem("razk_user")) || null;
+    localStorage.removeItem(TOKEN_KEY);
+    localStorage.removeItem(USER_KEY);
+    return JSON.parse(getSessionValue(USER_KEY)) || null;
   } catch {
     return null;
   }
@@ -13,12 +44,11 @@ const storedUser = () => {
 
 export const AuthProvider = ({ children }) => {
   const [user, setUser] = useState(storedUser);
-  const [token, setToken] = useState(localStorage.getItem("razk_token"));
+  const [token, setToken] = useState(getSessionValue(TOKEN_KEY));
   const [authReady, setAuthReady] = useState(false);
 
   const clearSession = useCallback(() => {
-    localStorage.removeItem("razk_token");
-    localStorage.removeItem("razk_user");
+    clearAuthStorage();
     setToken(null);
     setUser(null);
   }, []);
@@ -29,18 +59,19 @@ export const AuthProvider = ({ children }) => {
       password: credentials.password
     };
     const { data } = await api.post("/auth/login", payload);
-    localStorage.setItem("razk_token", data.token);
-    localStorage.setItem("razk_user", JSON.stringify(data.user));
+    clearAuthStorage();
+    setSessionValue(TOKEN_KEY, data.token);
+    setSessionValue(USER_KEY, JSON.stringify(data.user));
     setToken(data.token);
     setUser(data.user);
     return data.user;
   };
 
   const refreshMe = async () => {
-    if (!localStorage.getItem("razk_token")) return null;
+    if (!getSessionValue(TOKEN_KEY)) return null;
     try {
       const { data } = await api.get("/auth/me");
-      localStorage.setItem("razk_user", JSON.stringify(data.user));
+      setSessionValue(USER_KEY, JSON.stringify(data.user));
       setUser(data.user);
       return data.user;
     } catch (error) {
@@ -63,7 +94,7 @@ export const AuthProvider = ({ children }) => {
     let active = true;
 
     const bootstrap = async () => {
-      if (!localStorage.getItem("razk_token")) {
+      if (!getSessionValue(TOKEN_KEY)) {
         if (active) setAuthReady(true);
         return;
       }

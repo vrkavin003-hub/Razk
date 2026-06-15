@@ -173,10 +173,10 @@ export default function AppLayout() {
   const currentLabel = activeItem ? menuLabel(activeItem) : "Workspace";
 
   const sidebar = (
-    <aside className="flex h-full w-72 flex-col border-r border-slate-200 bg-white/95 backdrop-blur dark:border-slate-700 dark:bg-slate-950">
-      <div className="flex h-20 items-center gap-3 border-b border-slate-100 px-5 dark:border-slate-700">
+    <aside className="flex h-full w-72 flex-col border-r border-slate-200 bg-white/95 backdrop-blur dark:border-[#203e6f] dark:bg-[#09192e]">
+      <div className="flex h-20 items-center gap-3 border-b border-slate-100 px-5 dark:border-[#203e6f]">
         <CompanyLogo />
-      <span className="ml-auto rounded-full bg-emerald-50 px-2.5 py-1 text-[11px] font-black uppercase text-emerald-700 ring-1 ring-emerald-100 dark:bg-emerald-950 dark:text-emerald-200 dark:ring-emerald-800">
+        <span className="ml-auto rounded-full bg-emerald-50 px-2.5 py-1 text-[11px] font-black uppercase text-emerald-700 ring-1 ring-emerald-100 dark:bg-emerald-950 dark:text-emerald-200 dark:ring-emerald-800">
           Live
         </span>
       </div>
@@ -218,10 +218,10 @@ export default function AppLayout() {
           </div>
         ))}
       </nav>
-      <div className="border-t border-slate-100 p-4 dark:border-slate-700">
-        <div className="mb-4 rounded-lg border border-slate-200 bg-slate-50 p-3 dark:border-slate-700 dark:bg-slate-900">
+      <div className="border-t border-slate-100 p-4 dark:border-[#203e6f]">
+        <div className="mb-4 rounded-lg border border-slate-200 bg-slate-50 p-3 dark:border-[#203e6f] dark:bg-[#0c1f3d]">
           <div className="mb-3 flex items-center gap-3">
-          <UserAvatar name={user?.name} photo={user?.profilePhoto} />
+            <UserAvatar name={user?.name} photo={user?.profilePhoto} />
             <div className="min-w-0">
               <p className="truncate text-sm font-black text-slate-900 dark:text-slate-100">{user?.name}</p>
               <p className="truncate text-xs font-semibold text-slate-500 dark:text-slate-300">
@@ -230,7 +230,7 @@ export default function AppLayout() {
             </div>
           </div>
           <div className="flex items-center justify-between gap-2 text-xs">
-            <span className="rounded-full bg-white px-2.5 py-1 font-black text-slate-600 ring-1 ring-slate-200 dark:bg-slate-800 dark:text-slate-100 dark:ring-slate-700">
+            <span className="rounded-full bg-white px-2.5 py-1 font-black text-slate-600 ring-1 ring-slate-200 dark:bg-[#123052] dark:text-blue-100 dark:ring-[#24456f]">
               {roleLabel}
             </span>
             <span className="inline-flex items-center gap-1 font-bold text-emerald-700 dark:text-emerald-200">
@@ -263,10 +263,10 @@ export default function AppLayout() {
         </div>
       ) : null}
       <div className="md:pl-72">
-        <header className="mobile-safe-top sticky top-0 z-20 flex min-h-[72px] items-center justify-between border-b border-slate-200 bg-white/90 px-4 py-3 backdrop-blur-xl md:px-8 dark:border-slate-700 dark:bg-slate-950/95">
+        <header className="mobile-safe-top sticky top-0 z-20 flex min-h-[72px] items-center justify-between border-b border-slate-200 bg-white/90 px-4 py-3 backdrop-blur-xl md:px-8 dark:border-[#203e6f] dark:bg-[#09192e]/95">
           <div className="flex min-w-0 items-center gap-3">
             <button
-              className="inline-grid h-10 w-10 place-items-center rounded-lg border border-slate-200 bg-white text-slate-700 shadow-sm shadow-slate-900/5 md:hidden dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100"
+              className="inline-grid h-10 w-10 place-items-center rounded-lg border border-slate-200 bg-white text-slate-700 shadow-sm shadow-slate-900/5 md:hidden dark:border-[#203e6f] dark:bg-[#0c1f3d] dark:text-blue-100"
               onClick={() => setOpen((current) => !current)}
               aria-label="Open menu"
             >

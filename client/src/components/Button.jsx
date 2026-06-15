@@ -1,8 +1,8 @@
 const variants = {
   primary:
-    "bg-slate-950 text-white shadow-sm shadow-slate-900/20 hover:bg-slate-800 focus:ring-slate-200 dark:bg-slate-100 dark:text-slate-950 dark:shadow-none",
+    "bg-hya-600 text-white shadow-sm shadow-hya-600/20 hover:bg-hya-700 focus:ring-hya-100 dark:bg-blue-100 dark:text-hya-950 dark:shadow-none dark:hover:bg-white dark:focus:ring-[#24456f]",
   secondary:
-    "border border-slate-200 bg-white text-slate-700 shadow-sm shadow-slate-900/5 hover:border-slate-300 hover:bg-slate-50 focus:ring-slate-100 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100 dark:shadow-none dark:hover:bg-slate-800 dark:focus:ring-slate-600",
+    "border border-slate-200 bg-white text-slate-700 shadow-sm shadow-slate-900/5 hover:border-hya-100 hover:bg-hya-50 hover:text-hya-700 focus:ring-hya-100 dark:border-[#203e6f] dark:bg-[#0c1f3d] dark:text-blue-100 dark:shadow-none dark:hover:bg-[#173b62] dark:focus:ring-[#24456f]",
   danger:
     "bg-rose-600 text-white shadow-sm shadow-rose-600/20 hover:bg-rose-700 focus:ring-rose-100 dark:shadow-none",
   success:
@@ -10,7 +10,7 @@ const variants = {
   warning:
     "bg-amber-500 text-white shadow-sm shadow-amber-500/20 hover:bg-amber-600 focus:ring-amber-100 dark:shadow-none",
   ghost:
-    "text-slate-600 hover:bg-slate-100 hover:text-slate-950 focus:ring-slate-100 dark:text-slate-100 dark:hover:bg-slate-800 dark:hover:text-white dark:focus:ring-slate-600"
+    "text-slate-600 hover:bg-hya-50 hover:text-hya-700 focus:ring-hya-100 dark:text-blue-100 dark:hover:bg-[#173b62] dark:hover:text-white dark:focus:ring-[#24456f]"
 };
 
 const sizes = {
