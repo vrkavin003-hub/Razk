@@ -6,8 +6,6 @@ const employeeFields = "name email employeeId department designation profilePhot
 const roleLabel = (role = "") => String(role || "").toLowerCase();
 const idOf = (value) => String(value?._id || value || "");
 
-const escapeRegex = (value = "") => String(value).replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-
 const isHrDepartment = (department = "") => String(department || "").trim().toLowerCase() === "hr";
 
 const appError = (message, statusCode = 400) => {
@@ -16,20 +14,21 @@ const appError = (message, statusCode = 400) => {
   return error;
 };
 
-const findDepartmentDri = async (department) => {
-  if (!department) return null;
-  return User.findOne({
-    department: { $regex: `^${escapeRegex(department)}$`, $options: "i" },
-    isActive: true,
-    role: "dri"
-  }).sort({ createdAt: 1 });
-};
-
 const findRoleApprover = async (role) =>
   User.findOne({
     isActive: true,
     role
   }).sort({ createdAt: 1 });
+
+const findHrOrAdminApprover = async () => {
+  const hr = await findRoleApprover("hr");
+  if (hr) return { role: "hr", user: hr };
+
+  const admin = await findRoleApprover("admin");
+  if (admin) return { role: "admin", user: admin };
+
+  return null;
+};
 
 const requestSnapshot = (requester, requestType) => ({
   requestType,
@@ -46,17 +45,23 @@ const resolveRequestAssignment = async (requester) => {
     throw appError("Admin self-request is not enabled. Please use HR/Admin workflow.", 403);
   }
 
-  if (requesterRole === "employee" || requesterRole === "hr") {
-    const dri = await findDepartmentDri(requester.department);
-    if (!dri) {
-      throw appError("No DRI assigned for your department. Please contact HR/Admin.", 400);
-    }
+  if (requesterRole === "employee") {
+    const approver = await findHrOrAdminApprover();
+    if (!approver) throw appError("No HR/Admin approver is available. Please contact support.", 400);
     return {
-      assignedApproverRole: "dri",
-      assignedApprover: dri._id,
-      assignedApproverName: dri.name,
-      assignedDri: dri._id,
-      assignedDriName: dri.name
+      assignedApproverRole: approver.role,
+      assignedApprover: approver.user._id,
+      assignedApproverName: approver.user.name
+    };
+  }
+
+  if (requesterRole === "hr") {
+    const admin = await findRoleApprover("admin");
+    if (!admin) throw appError("No Admin approver is available. Please contact support.", 400);
+    return {
+      assignedApproverRole: "admin",
+      assignedApprover: admin._id,
+      assignedApproverName: admin.name
     };
   }
 
