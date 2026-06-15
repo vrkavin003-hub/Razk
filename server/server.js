@@ -26,7 +26,24 @@ app.disable("x-powered-by");
 app.set("trust proxy", Number(process.env.TRUST_PROXY || 1));
 
 const startupConfig = getStartupConfig();
-validateStartupConfiguration(startupConfig);
+
+const logStartupStatus = () => {
+  const status = getEnvironmentStatus();
+  console.log(
+    "Startup configuration:",
+    JSON.stringify({
+      databaseMode: startupConfig.databaseMode,
+      environment: process.env.NODE_ENV || "development",
+      hasClientOrigin: status.CLIENT_ORIGIN,
+      hasJwtSecret: status.JWT_SECRET,
+      hasMongoUri: status.MONGO_URI,
+      localStoreAllowed: startupConfig.allowLocalStore,
+      port: startupConfig.port,
+      renderServiceId: process.env.RENDER_SERVICE_ID || "",
+      renderHostname: process.env.RENDER_EXTERNAL_HOSTNAME || ""
+    })
+  );
+};
 
 const runtimeState = {
   database: {
@@ -124,6 +141,9 @@ const mountMongoApi = () => {
 };
 
 const startServer = async () => {
+  logStartupStatus();
+  validateStartupConfiguration(startupConfig);
+
   const allowLocalStore = startupConfig.allowLocalStore && !startupConfig.isProduction;
 
   if (startupConfig.useSql) {
@@ -169,8 +189,13 @@ const startServer = async () => {
   app.use(startupConfig.useSql ? sqlErrorHandler : errorHandler);
 
   const port = startupConfig.port;
-  const server = app.listen(port, () => {
+  const server = app.listen(port, "0.0.0.0", () => {
     console.log(`Razk Automation HRMS API running on port ${port}`);
+  });
+
+  server.on("error", (error) => {
+    console.error("HTTP server failed to start:", error.stack || error.message || error);
+    process.exit(1);
   });
 
   const shutdown = (signal) => {
@@ -182,7 +207,17 @@ const startServer = async () => {
   process.on("SIGTERM", () => shutdown("SIGTERM"));
 };
 
+process.on("uncaughtException", (error) => {
+  console.error("Uncaught exception:", error.stack || error.message || error);
+  process.exit(1);
+});
+
+process.on("unhandledRejection", (reason) => {
+  console.error("Unhandled rejection:", reason && reason.stack ? reason.stack : reason);
+  process.exit(1);
+});
+
 startServer().catch((error) => {
-  console.error(error);
+  console.error("Fatal startup error:", error.stack || error.message || error);
   process.exit(1);
 });
