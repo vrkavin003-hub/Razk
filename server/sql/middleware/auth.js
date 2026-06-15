@@ -1,4 +1,5 @@
 const jwt = require("jsonwebtoken");
+const { getJwtSecret } = require("../../config/authSecret");
 const { query } = require("../db");
 const HttpError = require("../utils/httpError");
 
@@ -20,7 +21,7 @@ const protect = async (req, _res, next) => {
 
     if (scheme !== "Bearer" || !token) throw new HttpError("Not authorized, token missing", 401);
 
-    const decoded = jwt.verify(token, process.env.JWT_SECRET);
+    const decoded = jwt.verify(token, getJwtSecret());
     const users = await query(
       `SELECT id, username, email, role, status FROM admin_users WHERE id = :id AND status = 'active' LIMIT 1`,
       { id: decoded.id }

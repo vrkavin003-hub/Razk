@@ -1,13 +1,9 @@
 const crypto = require("crypto");
 const jwt = require("jsonwebtoken");
+const { getJwtSecret } = require("../../config/authSecret");
 
 const accessTokenTtl = process.env.JWT_EXPIRES_IN || "15m";
 const refreshDays = Number(process.env.REFRESH_TOKEN_DAYS || 30);
-
-const jwtSecret = () => {
-  if (!process.env.JWT_SECRET) throw new Error("JWT_SECRET is required");
-  return process.env.JWT_SECRET;
-};
 
 const signAccessToken = (user) =>
   jwt.sign(
@@ -16,7 +12,7 @@ const signAccessToken = (user) =>
       email: user.email,
       role: user.role
     },
-    jwtSecret(),
+    getJwtSecret(),
     { expiresIn: accessTokenTtl }
   );
 
