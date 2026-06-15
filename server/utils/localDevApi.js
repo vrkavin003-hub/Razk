@@ -3,6 +3,7 @@ const crypto = require("crypto");
 const fs = require("fs");
 const jwt = require("jsonwebtoken");
 const path = require("path");
+const { getJwtSecret } = require("../config/authSecret");
 const toCsv = require("./csv");
 const { daysBetweenInclusive, getWorkingHours, isLateCheckIn, toDateKey } = require("./dates");
 const { buildLocationDecision, normalizeAttendanceLocation, validateCoordinates } = require("./geo");
@@ -172,7 +173,7 @@ const sanitizeUser = (user) => {
 };
 
 const generateToken = (id) =>
-  jwt.sign({ id }, process.env.JWT_SECRET || "razk-automation-local-dev-secret", {
+  jwt.sign({ id }, getJwtSecret(), {
     expiresIn: "7d"
   });
 
@@ -187,7 +188,7 @@ const protect = (req, res, next) => {
   }
 
   try {
-    const decoded = jwt.verify(token, process.env.JWT_SECRET || "razk-automation-local-dev-secret");
+    const decoded = jwt.verify(token, getJwtSecret());
     const user = matchUser(decoded.id);
     if (!user) return json(res, { message: "Not authorized, user inactive or missing" }, 401);
     req.user = user;

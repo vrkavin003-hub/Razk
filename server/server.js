@@ -17,6 +17,7 @@ const { connectSql } = require("./sql/db");
 const sqlErrorHandler = require("./sql/middleware/error");
 const mountSqlApi = require("./sql/mountSqlApi");
 const mountLocalDevApi = require("./utils/localDevApi");
+const { ensureDefaultAdmin } = require("./utils/defaultAdmin");
 
 dotenv.config();
 
@@ -143,6 +144,9 @@ const startServer = async () => {
       runtimeState.database = { mode: "mongodb", status: "connecting", message: "Connecting to MongoDB" };
       await connectDB();
       runtimeState.database = { mode: "mongodb", status: "connected", message: "MongoDB connection is active" };
+      if (await ensureDefaultAdmin()) {
+        console.log("Default admin created: admin@razkautomation.com / Admin@12345");
+      }
       mountMongoApi();
     } catch (error) {
       if (!allowLocalStore) {

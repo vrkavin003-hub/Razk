@@ -61,8 +61,6 @@ const validateStartupConfiguration = (startupConfig) => {
   const missing = [];
 
   if (!process.env.PORT) missing.push("PORT");
-  if (!process.env.JWT_SECRET) missing.push("JWT_SECRET");
-  if (!process.env.CLIENT_ORIGIN && !process.env.CLIENT_URL) missing.push("CLIENT_ORIGIN");
 
   if (startupConfig.databaseMode === "sqlserver") {
     if (

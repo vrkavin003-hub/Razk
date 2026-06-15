@@ -1,16 +1,8 @@
 const crypto = require("crypto");
 const jwt = require("jsonwebtoken");
+const { getJwtSecret } = require("../config/authSecret");
 const asyncHandler = require("../utils/asyncHandler");
 const User = require("../models/User");
-
-const getJwtSecret = () => {
-  if (!process.env.JWT_SECRET) {
-    const error = new Error("JWT_SECRET is missing. Set it in the backend environment before using authentication.");
-    error.statusCode = 500;
-    throw error;
-  }
-  return process.env.JWT_SECRET;
-};
 
 const generateToken = (id) =>
   jwt.sign({ id }, getJwtSecret(), {

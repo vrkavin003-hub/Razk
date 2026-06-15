@@ -3,6 +3,9 @@
   "version": "1.0.0",
   "description": "Backend API for Razk Automation Employee Management System",
   "main": "server.js",
+  "engines": {
+    "node": "22.x"
+  },
   "scripts": {
     "dev": "nodemon server.js",
     "start": "node server.js",

@@ -1,36 +1,19 @@
 const dotenv = require("dotenv");
 const connectDB = require("../config/db");
-const User = require("../models/User");
+const { DEFAULT_ADMIN_EMAIL, ensureDefaultAdmin } = require("../utils/defaultAdmin");
 
 dotenv.config();
 
 const seedAdmin = async () => {
   await connectDB();
 
-  const adminEmail = "admin@razkautomation.com";
-  const existing = await User.findOne({ email: adminEmail });
-
-  if (existing) {
+  if (!(await ensureDefaultAdmin())) {
     console.log("Default admin already exists");
     process.exit(0);
   }
 
-  await User.create({
-    name: "Razk Automation Admin",
-    email: adminEmail,
-    password: "Admin@12345",
-    role: "admin",
-    employeeId: "RAZK-ADMIN-001",
-    department: "Administration",
-    designation: "System Administrator",
-    phone: "9000000000",
-    joiningDate: new Date(),
-    address: "Razk Automation Manufacturing Office",
-    emergencyContact: "9000000001"
-  });
-
   console.log("Default admin created");
-  console.log("Email: admin@razkautomation.com");
+  console.log(`Email: ${DEFAULT_ADMIN_EMAIL}`);
   console.log("Password: Admin@12345");
   process.exit(0);
 };
