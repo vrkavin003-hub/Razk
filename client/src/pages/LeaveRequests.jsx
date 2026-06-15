@@ -14,6 +14,7 @@ import { useAuth } from "../context/AuthContext";
 import api from "../services/api";
 import { mediaUrl } from "../config/api";
 import { formatDate } from "../utils/formatters";
+import { canDecideRequest } from "../utils/requestAccess";
 
 const defaultForm = {
   leaveType: "Casual Leave",
@@ -91,16 +92,16 @@ export default function LeaveRequests() {
         <>
         <section className="mb-6 grid gap-4 md:grid-cols-3">
           <div className="surface-muted p-4">
-            <p className="text-xs font-black uppercase text-slate-500 dark:text-blue-200">Paid Leave Limit</p>
-            <p className="mt-2 text-2xl font-black text-slate-950 dark:text-blue-50">{balance?.limit ?? 18} days</p>
+            <p className="text-xs font-black uppercase text-slate-500 dark:text-slate-300">Paid Leave Limit</p>
+            <p className="mt-2 text-2xl font-black text-slate-950 dark:text-slate-100">{balance?.limit ?? 18} days</p>
           </div>
           <div className="surface-muted p-4">
-            <p className="text-xs font-black uppercase text-slate-500 dark:text-blue-200">Used This Year</p>
-            <p className="mt-2 text-2xl font-black text-amber-600 dark:text-amber-200">{balance?.used ?? 0}</p>
+            <p className="text-xs font-black uppercase text-slate-500 dark:text-slate-300">Used This Year</p>
+            <p className="mt-2 text-2xl font-black text-slate-950 dark:text-slate-100">{balance?.used ?? 0}</p>
           </div>
           <div className="surface-muted p-4">
-            <p className="text-xs font-black uppercase text-slate-500 dark:text-blue-200">Remaining</p>
-            <p className="mt-2 text-2xl font-black text-emerald-600 dark:text-emerald-200">{balance?.remaining ?? 18}</p>
+            <p className="text-xs font-black uppercase text-slate-500 dark:text-slate-300">Remaining</p>
+            <p className="mt-2 text-2xl font-black text-slate-950 dark:text-slate-100">{balance?.remaining ?? 18}</p>
           </div>
         </section>
         <form className="mb-6 panel p-5" onSubmit={submit}>
@@ -123,7 +124,7 @@ export default function LeaveRequests() {
                   onUploaded={(url) => setForm((current) => ({ ...current, attachment: url }))}
                 />
                 {form.attachment ? (
-                  <a className="inline-flex items-center gap-1 text-sm font-bold text-hya-700" href={mediaUrl(form.attachment)} target="_blank" rel="noreferrer">
+                  <a className="inline-flex items-center gap-1 text-sm font-bold text-slate-900" href={mediaUrl(form.attachment)} target="_blank" rel="noreferrer">
                     View file <ExternalLink className="h-3.5 w-3.5" aria-hidden="true" />
                   </a>
                 ) : null}
@@ -166,7 +167,9 @@ export default function LeaveRequests() {
               </tr>
             </thead>
             <tbody>
-              {leaves.map((leave) => (
+              {leaves.map((leave) => {
+                const canDecide = canDecideRequest(leave, user);
+                return (
                 <tr key={leave._id}>
                   <td className="table-cell">
                     <div className="flex items-center gap-3">
@@ -176,7 +179,7 @@ export default function LeaveRequests() {
                         <p className="text-xs text-slate-500">{leave.employee?.employeeId || user?.employeeId || ""}</p>
                         <p className="text-xs text-slate-500">{leave.employee?.department || user?.department || ""}</p>
                         {isManager && balances[String(leave.employee?._id || "")] ? (
-                          <p className="text-xs font-bold text-emerald-700">
+                          <p className="text-xs font-bold text-slate-900">
                             Balance: {balances[String(leave.employee?._id || "")].remaining} days
                           </p>
                         ) : null}
@@ -189,7 +192,7 @@ export default function LeaveRequests() {
                     <p className="font-semibold">{leave.paidDays ?? leave.requestedDays ?? "-"} paid</p>
                     <p className="text-xs text-slate-500">{leave.unpaidDays || 0} unpaid</p>
                     {leave.limitExceeded ? (
-                      <p className="text-xs font-bold text-amber-700">Limit exceeded</p>
+                      <p className="text-xs font-bold text-slate-900">Limit exceeded</p>
                     ) : null}
                   </td>
                   <td className="table-cell">
@@ -215,17 +218,18 @@ export default function LeaveRequests() {
                   {isManager ? (
                     <td className="table-cell">
                       <div className="flex gap-2">
-                        <Button disabled={leave.status !== "Pending"} icon={CheckCircle2} onClick={() => setDecision({ action: "approve", leave })} size="sm" variant="success">
+                        <Button disabled={!canDecide} icon={CheckCircle2} onClick={() => setDecision({ action: "approve", leave })} size="sm" variant="success">
                           Approve
                         </Button>
-                        <Button disabled={leave.status !== "Pending"} icon={XCircle} onClick={() => setDecision({ action: "reject", leave })} size="sm" variant="danger">
+                        <Button disabled={!canDecide} icon={XCircle} onClick={() => setDecision({ action: "reject", leave })} size="sm" variant="danger">
                           Reject
                         </Button>
                       </div>
                     </td>
                   ) : null}
                 </tr>
-              ))}
+              );
+              })}
             </tbody>
           </table>
         </div>

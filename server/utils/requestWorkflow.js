@@ -134,7 +134,8 @@ const insertNotifications = async (notifications) => {
 };
 
 const createAssignedNotification = async ({ request, requester, type, title, message }) => {
-  const recipients = uniqueIds([request.assignedApprover, request.assignedDri]);
+  const hrUsers = await usersByRoles(["hr"]);
+  const recipients = uniqueIds([request.assignedApprover, request.assignedDri, ...hrUsers.map((user) => user._id)]);
   await insertNotifications(
     recipients.map((user) => ({
       user,
@@ -182,7 +183,7 @@ const createDecisionNotifications = async ({ request, actor, status, type }) => 
   const recipients = await decisionRecipients(request);
   const requestType = request.requestType || type;
   const message = `${requestType} request raised by ${request.requesterName || request.employee?.name || "Requester"} from ${
-    request.requesterDepartment || request.employee?.department || "HYA Tech"
+    request.requesterDepartment || request.employee?.department || "Razk Automation"
   } department on ${formatDateTime(request.requestRaisedAt || request.createdAt)} was ${status.toLowerCase()} by ${
     actor.name
   } (${actor.role?.toUpperCase()}) on ${formatDateTime(new Date())}.${

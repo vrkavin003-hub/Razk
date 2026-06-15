@@ -1,8 +1,8 @@
 {
-  "name": "hya-tech-employee-management-system",
+  "name": "razk-automation-employee-management-system",
   "version": "1.0.0",
   "private": true,
-  "description": "Root launcher for HYA Tech HRMS client and server",
+  "description": "Root launcher for Razk Automation HRMS client and server",
   "scripts": {
     "dev": "node scripts/start-dev.js",
     "dev:server": "npm --prefix server run dev",

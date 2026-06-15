@@ -1,8 +1,8 @@
-CREATE DATABASE IF NOT EXISTS hyatech_db
+CREATE DATABASE IF NOT EXISTS razkautomation_db
   CHARACTER SET utf8mb4
   COLLATE utf8mb4_unicode_ci;
 
-USE hyatech_db;
+USE razkautomation_db;
 
 CREATE TABLE IF NOT EXISTS admin_users (
   id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,

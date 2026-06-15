@@ -1,6 +1,6 @@
-# HYA Tech Attendance App
+# Razk Automation Attendance App
 
-Full-stack HYA Tech attendance and HRMS application built with React, Vite, Tailwind CSS, Express, JWT authentication, MongoDB/local development fallback, optional MySQL SQL API modules, and Capacitor Android.
+Full-stack Razk Automation attendance and HRMS application built with React, Vite, Tailwind CSS, Express, JWT authentication, MongoDB/local development fallback, SQL Server production API modules, and Capacitor Android.
 
 ## What Is Included
 
@@ -37,13 +37,18 @@ server/
 Create `server/.env` from `server/.env.example`:
 
 ```env
-MONGO_URI=mongodb://127.0.0.1:27017/hya-tech-hrms
+MONGO_URI=mongodb://127.0.0.1:27017/razk-automation-hrms
 JWT_SECRET=replace-with-a-long-random-secret
 JWT_REFRESH_SECRET=replace-with-a-different-long-random-secret
 PORT=5000
 CLIENT_ORIGIN=http://localhost:5174
 ALLOW_LOCAL_STORE=true
 ```
+
+Production deployment should set `NODE_ENV=production`, `ALLOW_LOCAL_STORE=false`, and one database mode explicitly:
+
+- MongoDB mode: set `MONGO_URI`
+- SQL Server mode: set `DB_CLIENT=sqlserver` plus `DATABASE_URL` or the `SQLSERVER_*` fields
 
 Create `client/.env` from `client/.env.example`:
 
@@ -77,6 +82,8 @@ npm run dev
 The backend runs on `http://localhost:5000` by default.
 
 If MongoDB is unavailable and `ALLOW_LOCAL_STORE` is not `false`, the server starts with a local JSON development store at `server/data/local-dev-db.json`. This is useful for immediate local login testing.
+
+In production, the server now fails fast if required environment variables are missing or if local fallback is still enabled.
 
 Health check:
 
@@ -112,21 +119,21 @@ npm run build
 Default admin:
 
 ```text
-Email: admin@hyatech.com
+Email: admin@razkautomation.com
 Password: Admin@12345
 ```
 
 Demo HR:
 
 ```text
-Email: hr@hyatech.com
+Email: hr@razkautomation.com
 Password: HR@12345
 ```
 
 Demo employee:
 
 ```text
-Email: employee@hyatech.com
+Email: employee@razkautomation.com
 Password: Employee@123
 ```
 
@@ -135,7 +142,7 @@ Login API test:
 ```bash
 curl -X POST http://localhost:5000/api/auth/login \
   -H "Content-Type: application/json" \
-  -d "{\"email\":\"admin@hyatech.com\",\"password\":\"Admin@12345\"}"
+  -d "{\"email\":\"admin@razkautomation.com\",\"password\":\"Admin@12345\"}"
 ```
 
 Protected route test:
@@ -171,8 +178,8 @@ Capacitor is configured in `client/capacitor.config.json`:
 
 ```json
 {
-  "appId": "com.hyatech.attendance",
-  "appName": "HYA Tech",
+  "appId": "com.razkautomation.attendance",
+  "appName": "Razk Automation",
   "webDir": "dist"
 }
 ```
@@ -260,6 +267,16 @@ CLIENT_ORIGIN=https://your-frontend-domain.com
 ALLOW_LOCAL_STORE=false
 ```
 
+If you use SQL Server in production, set:
+
+```env
+DB_CLIENT=sqlserver
+DATABASE_URL=sqlserver://SERVER_NAME;database=DATABASE_NAME;user=USERNAME;password=PASSWORD;trustServerCertificate=true
+SQLSERVER_USER=
+SQLSERVER_PASSWORD=
+SQLSERVER_DATABASE=
+```
+
 Frontend deployment:
 
 ```bash
@@ -285,9 +302,19 @@ npx cap open android
 
 ## SQL Backend Documents
 
-- Complete schema: `server/database/schema.sql`
+- MySQL schema: `server/database/schema.sql`
+- SQL Server schema: `server/database/sqlserver-schema.sql`
 - Schema diagram: `docs/sql-database-schema.md`
 - API reference: `docs/sql-api-reference.md`
 - Setup and deployment: `docs/sql-setup-and-deployment.md`
 - Migration plan: `docs/sql-migration-plan.md`
 - Location attendance guide: `docs/location-attendance.md`
+
+To create the SQL Server database for this app without installing `sqlcmd`, run:
+
+```bash
+cd server
+npm run db:sqlserver:schema
+```
+
+The script reads `server/.env`, creates `razk_automation_hrms` if it does not exist, and then creates the tables from `server/database/sqlserver-schema.sql`. You can also run the schema manually in SQL Server Management Studio.

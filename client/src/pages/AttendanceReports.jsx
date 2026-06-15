@@ -180,7 +180,7 @@ export default function AttendanceReports() {
     <>
       <PageHeader
         title="Reports"
-        description="Generate professional attendance reports and export PDF or Excel files with HYA Tech branding."
+        description="Generate professional attendance reports and export PDF or Excel files with Razk Automation branding."
         action={
           <div className="flex flex-wrap gap-2">
             <Button icon={FileSpreadsheet} onClick={exportExcel} variant="secondary">

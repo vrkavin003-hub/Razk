@@ -37,17 +37,17 @@ const createInitialData = () => ({
   users: [
     {
       _id: newId(),
-      name: "HYA Tech Admin",
-      email: "admin@hyatech.com",
+      name: "Razk Automation Admin",
+      email: "admin@razkautomation.com",
       password: bcrypt.hashSync("Admin@12345", 10),
       role: "admin",
-      employeeId: "HYA-ADMIN-001",
+      employeeId: "RAZK-ADMIN-001",
       department: "Administration",
       designation: "System Administrator",
       assignedShift: "",
       phone: "9000000000",
       joiningDate: new Date().toISOString(),
-      address: "HYA Tech Manufacturing Office",
+      address: "Razk Automation Manufacturing Office",
       emergencyContact: "9000000001",
       profilePhoto: "",
       isActive: true,
@@ -57,16 +57,16 @@ const createInitialData = () => ({
     {
       _id: newId(),
       name: "Demo HR",
-      email: "hr@hyatech.com",
+      email: "hr@razkautomation.com",
       password: bcrypt.hashSync("HR@12345", 10),
       role: "hr",
-      employeeId: "HYA-DEMO-HR",
+      employeeId: "RAZK-DEMO-HR",
       department: "HR",
       designation: "HR Executive",
       assignedShift: "General Shift",
       phone: "9000000201",
       joiningDate: new Date().toISOString(),
-      address: "HYA Tech Office",
+      address: "Razk Automation Office",
       emergencyContact: "9000000202",
       profilePhoto: "",
       isActive: true,
@@ -76,16 +76,16 @@ const createInitialData = () => ({
     {
       _id: newId(),
       name: "Demo Employee",
-      email: "employee@hyatech.com",
+      email: "employee@razkautomation.com",
       password: bcrypt.hashSync("Employee@123", 10),
       role: "employee",
-      employeeId: "HYA-DEMO-EMP",
+      employeeId: "RAZK-DEMO-EMP",
       department: "Production",
       designation: "Machine Operator",
       assignedShift: "",
       phone: "9000000101",
       joiningDate: new Date().toISOString(),
-      address: "HYA Tech Floor",
+      address: "Razk Automation Floor",
       emergencyContact: "9000000102",
       profilePhoto: "",
       isActive: true,
@@ -96,7 +96,7 @@ const createInitialData = () => ({
   officeLocations: [
     {
       _id: newId(),
-      officeName: "HYA Tech",
+      officeName: "Razk Automation",
       latitude: 12.740912,
       longitude: 77.825292,
       radiusMeters: 100,
@@ -114,7 +114,7 @@ const createInitialData = () => ({
   announcements: [
     {
       _id: newId(),
-      title: "Welcome to HYA Tech HRMS",
+      title: "Welcome to Razk Automation HRMS",
       message: "Use this system for attendance, leave, permissions, and company updates.",
       targetRole: "all",
       createdBy: "system",
@@ -144,7 +144,7 @@ db.visitors = db.visitors || [];
 db.officeLocations = db.officeLocations || [
   {
     _id: newId(),
-    officeName: "HYA Tech",
+    officeName: "Razk Automation",
     latitude: 12.740912,
     longitude: 77.825292,
     radiusMeters: 100,
@@ -172,7 +172,7 @@ const sanitizeUser = (user) => {
 };
 
 const generateToken = (id) =>
-  jwt.sign({ id }, process.env.JWT_SECRET || "hya-tech-local-dev-secret", {
+  jwt.sign({ id }, process.env.JWT_SECRET || "razk-automation-local-dev-secret", {
     expiresIn: "7d"
   });
 
@@ -187,7 +187,7 @@ const protect = (req, res, next) => {
   }
 
   try {
-    const decoded = jwt.verify(token, process.env.JWT_SECRET || "hya-tech-local-dev-secret");
+    const decoded = jwt.verify(token, process.env.JWT_SECRET || "razk-automation-local-dev-secret");
     const user = matchUser(decoded.id);
     if (!user) return json(res, { message: "Not authorized, user inactive or missing" }, 401);
     req.user = user;
@@ -301,6 +301,11 @@ const localAllRangeReport = ({ from, to, generatedBy }) =>
 const notificationRecipients = (targetRole) =>
   db.users
     .filter((user) => user.isActive && (targetRole === "all" || user.role === targetRole))
+    .map((user) => user._id);
+
+const hrNotificationRecipients = () =>
+  db.users
+    .filter((user) => user.isActive && user.role === "hr")
     .map((user) => user._id);
 
 const notifyUsers = ({ userIds, title, message, type = "system", createdBy }) => {
@@ -749,7 +754,7 @@ const mountLocalDevApi = (app) => {
     }
   });
 
-  app.post("/api/attendance/check-in", protect, (req, res) => {
+  app.post("/api/attendance/check-in", protect, authorize("employee", "hr", "admin", "dri"), (req, res) => {
     const date = toDateKey();
     if (db.attendance.some((record) => record.employee === req.user._id && record.date === date)) {
       return json(res, { message: "You have already checked in today" }, 409);
@@ -789,7 +794,7 @@ const mountLocalDevApi = (app) => {
     return json(res, { attendance, location, message: "Check-in marked successfully." }, 201);
   });
 
-  app.post("/api/attendance/check-out", protect, (req, res) => {
+  app.post("/api/attendance/check-out", protect, authorize("employee", "hr", "admin", "dri"), (req, res) => {
     const date = toDateKey();
     const attendance = db.attendance.find((record) => record.employee === req.user._id && record.date === date);
     if (!attendance?.checkIn) return json(res, { message: "You must check in before checking out" }, 400);
@@ -895,7 +900,7 @@ const mountLocalDevApi = (app) => {
     return res.send(toCsv(rows));
   });
 
-  app.post("/api/leave/apply", protect, (req, res) => {
+  app.post("/api/leave/apply", protect, authorize("employee", "dri"), (req, res) => {
     const { leaveType, fromDate, toDate, reason, attachment } = req.body;
     if (!leaveType || !fromDate || !toDate || !reason) {
       return json(res, { message: "Leave type, from date, to date, and reason are required" }, 400);
@@ -984,7 +989,7 @@ const mountLocalDevApi = (app) => {
     leave.limitExceeded = allowance.limitExceeded;
     leave.updatedAt = new Date().toISOString();
     notifyUsers({
-      userIds: [leave.employee],
+      userIds: [leave.employee, ...hrNotificationRecipients()],
       title: `Leave ${status.toLowerCase()}`,
       message: `Your leave request was ${status.toLowerCase()} by ${req.user.name}.`,
       type: "leave",
@@ -1001,7 +1006,7 @@ const mountLocalDevApi = (app) => {
   app.put("/api/leave/:id/approve", protect, authorize("admin", "hr", "dri"), decideLeave("Approved"));
   app.put("/api/leave/:id/reject", protect, authorize("admin", "hr", "dri"), decideLeave("Rejected"));
 
-  app.post("/api/permission/apply", protect, (req, res) => {
+  app.post("/api/permission/apply", protect, authorize("employee", "dri"), (req, res) => {
     const { permissionType, date, fromTime, toTime, reason } = req.body;
     if (!permissionType || !date || !fromTime || !toTime || !reason) {
       return json(res, { message: "Permission type, date, from time, to time, and reason are required" }, 400);
@@ -1088,7 +1093,7 @@ const mountLocalDevApi = (app) => {
     permission.limitExceeded = allowance.limitExceeded;
     permission.updatedAt = new Date().toISOString();
     notifyUsers({
-      userIds: [permission.employee],
+      userIds: [permission.employee, ...hrNotificationRecipients()],
       title: `Permission ${status.toLowerCase()}`,
       message: `Your permission request was ${status.toLowerCase()} by ${req.user.name}.`,
       type: "permission",
@@ -1173,7 +1178,7 @@ const mountLocalDevApi = (app) => {
     return json(res, { message: "Visitor record deleted" });
   });
 
-  app.post("/api/od/apply", protect, (req, res) => {
+  app.post("/api/od/apply", protect, authorize("employee", "dri"), (req, res) => {
     const { odDate, fromTime, toTime, reason, location } = req.body;
     if (!odDate || !fromTime || !toTime || !reason || !location) {
       return json(res, { message: "OD date, from time, to time, reason, and location are required" }, 400);
@@ -1259,7 +1264,7 @@ const mountLocalDevApi = (app) => {
     }
 
     notifyUsers({
-      userIds: [od.employee],
+      userIds: [od.employee, ...hrNotificationRecipients()],
       title: `OD ${status.toLowerCase()}`,
       message: `Your OD request was ${status.toLowerCase()} by ${req.user.name}.`,
       type: "od",
@@ -1336,12 +1341,18 @@ const mountLocalDevApi = (app) => {
   app.get("/api/notifications/counts", protect, (req, res) => {
     if (["admin", "hr"].includes(req.user.role)) {
       return json(res, {
-        odUpdateCount: 0,
+        odUpdateCount: db.notifications.filter(
+          (notification) => notification.user === req.user._id && notification.type === "od" && !notification.isRead
+        ).length,
         pendingODCount: db.odRequests.filter((request) => request.status === "Pending").length,
         pendingLeaveCount: db.leaves.filter((leave) => leave.status === "Pending").length,
         pendingPermissionCount: db.permissions.filter((permission) => permission.status === "Pending").length,
-        leaveUpdateCount: 0,
-        permissionUpdateCount: 0
+        leaveUpdateCount: db.notifications.filter(
+          (notification) => notification.user === req.user._id && notification.type === "leave" && !notification.isRead
+        ).length,
+        permissionUpdateCount: db.notifications.filter(
+          (notification) => notification.user === req.user._id && notification.type === "permission" && !notification.isRead
+        ).length
       });
     }
 

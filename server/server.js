@@ -7,6 +7,11 @@ const helmet = require("helmet");
 const morgan = require("morgan");
 const mongoose = require("mongoose");
 const connectDB = require("./config/db");
+const {
+  getEnvironmentStatus,
+  getStartupConfig,
+  validateStartupConfiguration
+} = require("./config/runtime");
 const { errorHandler, notFound } = require("./middleware/errorMiddleware");
 const { connectSql } = require("./sql/db");
 const sqlErrorHandler = require("./sql/middleware/error");
@@ -16,13 +21,12 @@ const mountLocalDevApi = require("./utils/localDevApi");
 dotenv.config();
 
 const app = express();
+app.disable("x-powered-by");
+app.set("trust proxy", Number(process.env.TRUST_PROXY || 1));
 
-const configuredClientOrigins = process.env.CLIENT_ORIGIN || process.env.CLIENT_URL || "http://localhost:5174";
-const allowedClientOrigins = configuredClientOrigins
-  .split(",")
-  .map((origin) => origin.trim())
-  .filter(Boolean);
-const mobileWebViewOrigins = ["capacitor://localhost", "ionic://localhost", "https://localhost"];
+const startupConfig = getStartupConfig();
+validateStartupConfiguration(startupConfig);
+
 const runtimeState = {
   database: {
     mode: "unknown",
@@ -30,13 +34,6 @@ const runtimeState = {
     message: "Server is starting"
   }
 };
-
-const requiredEnv = ["MONGO_URI", "JWT_SECRET", "JWT_REFRESH_SECRET", "PORT", "CLIENT_ORIGIN"];
-const envStatus = () =>
-  requiredEnv.reduce((status, key) => {
-    status[key] = Boolean(process.env[key] || (key === "CLIENT_ORIGIN" && process.env.CLIENT_URL));
-    return status;
-  }, {});
 
 app.use(
   helmet({
@@ -61,8 +58,8 @@ app.use(
 
       const isLocalDevOrigin = /^http:\/\/(localhost|127\.0\.0\.1):\d+$/.test(origin);
       if (
-        allowedClientOrigins.includes(origin) ||
-        mobileWebViewOrigins.includes(origin) ||
+        startupConfig.allowedClientOrigins.includes(origin) ||
+        startupConfig.mobileWebViewOrigins.includes(origin) ||
         (process.env.NODE_ENV !== "production" && isLocalDevOrigin)
       ) {
         callback(null, true);
@@ -88,7 +85,7 @@ app.get("/api/health", (req, res) => {
 
   res.json({
     status: "ok",
-    app: "HYA Tech Employee Management System",
+    app: "Razk Automation Employee Management System",
     server: {
       status: "running",
       environment: process.env.NODE_ENV || "development",
@@ -99,9 +96,11 @@ app.get("/api/health", (req, res) => {
       mongoose: mongoStatus
     },
     environment: {
-      configured: envStatus(),
-      clientOrigins: allowedClientOrigins,
-      mobileWebViewOrigins
+      configured: getEnvironmentStatus(),
+      clientOrigins: startupConfig.allowedClientOrigins,
+      databaseMode: startupConfig.databaseMode,
+      localStoreAllowed: startupConfig.allowLocalStore,
+      mobileWebViewOrigins: startupConfig.mobileWebViewOrigins
     },
     timestamp: new Date().toISOString()
   });
@@ -124,12 +123,20 @@ const mountMongoApi = () => {
 };
 
 const startServer = async () => {
-  const useSql = process.env.DB_CLIENT === "mysql" || process.env.USE_SQL === "true";
+  const allowLocalStore = startupConfig.allowLocalStore && !startupConfig.isProduction;
 
-  if (useSql) {
-    runtimeState.database = { mode: "mysql", status: "connecting", message: "Connecting to MySQL" };
+  if (startupConfig.useSql) {
+    runtimeState.database = {
+      mode: startupConfig.databaseMode,
+      status: "connecting",
+      message: `Connecting to ${startupConfig.databaseMode === "sqlserver" ? "SQL Server" : "MySQL"}`
+    };
     await connectSql();
-    runtimeState.database = { mode: "mysql", status: "connected", message: "MySQL connection is active" };
+    runtimeState.database = {
+      mode: startupConfig.databaseMode,
+      status: "connected",
+      message: `${startupConfig.databaseMode === "sqlserver" ? "SQL Server" : "MySQL"} connection is active`
+    };
     mountSqlApi(app);
   } else {
     try {
@@ -138,7 +145,7 @@ const startServer = async () => {
       runtimeState.database = { mode: "mongodb", status: "connected", message: "MongoDB connection is active" };
       mountMongoApi();
     } catch (error) {
-      if (process.env.ALLOW_LOCAL_STORE !== "true") {
+      if (!allowLocalStore) {
         runtimeState.database = { mode: "mongodb", status: "error", message: error.message };
         throw error;
       }
@@ -155,12 +162,20 @@ const startServer = async () => {
   }
 
   app.use(notFound);
-  app.use(useSql ? sqlErrorHandler : errorHandler);
+  app.use(startupConfig.useSql ? sqlErrorHandler : errorHandler);
 
-  const port = process.env.PORT || 5000;
-  app.listen(port, () => {
-    console.log(`HYA Tech HRMS API running on port ${port}`);
+  const port = startupConfig.port;
+  const server = app.listen(port, () => {
+    console.log(`Razk Automation HRMS API running on port ${port}`);
   });
+
+  const shutdown = (signal) => {
+    console.log(`Received ${signal}. Shutting down Razk Automation HRMS API...`);
+    server.close(() => process.exit(0));
+  };
+
+  process.on("SIGINT", () => shutdown("SIGINT"));
+  process.on("SIGTERM", () => shutdown("SIGTERM"));
 };
 
 startServer().catch((error) => {

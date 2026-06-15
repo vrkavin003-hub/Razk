@@ -20,6 +20,7 @@ const locationUnavailableMessage = "Attendance marked, but location could not be
 export default function AttendancePage() {
   const { user } = useAuth();
   const isManager = roleMatches(user?.role, ["admin", "hr"]);
+  const canMarkAttendance = roleMatches(user?.role, ["employee", "hr", "dri"]);
   const [records, setRecords] = useState(null);
   const [today, setToday] = useState(null);
   const [filters, setFilters] = useState({ date: "", department: "", employeeId: "" });
@@ -34,8 +35,11 @@ export default function AttendancePage() {
   const load = async () => {
     if (isManager) {
       const params = Object.fromEntries(Object.entries(filters).filter(([, value]) => value));
-      const { data } = await api.get("/attendance/all", { params });
+      const requests = [api.get("/attendance/all", { params })];
+      if (canMarkAttendance) requests.push(api.get("/attendance/today"));
+      const [{ data }, todayResponse] = await Promise.all(requests);
       setRecords(data.attendance);
+      if (todayResponse) setToday(todayResponse.data.attendance);
     } else {
       const [{ data: todayData }, { data: historyData }] = await Promise.all([
         api.get("/attendance/today"),
@@ -97,7 +101,7 @@ export default function AttendancePage() {
           </Button>
         }
       />
-      {!isManager ? (
+      {canMarkAttendance ? (
         <section className="mb-6 panel p-5">
           <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
             <div>
@@ -134,46 +138,46 @@ export default function AttendancePage() {
           </div>
           <div className="mt-5 grid gap-3 md:grid-cols-3">
             <div className="surface-muted p-4">
-              <p className="text-xs font-black uppercase text-slate-500 dark:text-blue-200">Location Status</p>
-              <p className="mt-2 text-sm font-black text-slate-950 dark:text-blue-50">{locationState.status}</p>
-              <p className="mt-1 text-xs text-slate-500 dark:text-blue-200">Attendance is allowed from any location.</p>
+              <p className="text-xs font-black uppercase text-slate-500 dark:text-slate-300">Location Status</p>
+              <p className="mt-2 text-sm font-black text-slate-950 dark:text-slate-100">{locationState.status}</p>
+              <p className="mt-1 text-xs text-slate-500 dark:text-slate-300">Attendance is allowed from any location.</p>
             </div>
             <div className="surface-muted p-4">
-              <p className="text-xs font-black uppercase text-slate-500 dark:text-blue-200">Coordinates</p>
-              <p className="mt-2 text-sm font-black text-slate-950 dark:text-blue-50">
+              <p className="text-xs font-black uppercase text-slate-500 dark:text-slate-300">Coordinates</p>
+              <p className="mt-2 text-sm font-black text-slate-950 dark:text-slate-100">
                 {locationState.coordinates ? `${locationState.coordinates.latitude}, ${locationState.coordinates.longitude}` : "-"}
               </p>
-              <p className="mt-1 text-xs text-slate-500 dark:text-blue-200">
+              <p className="mt-1 text-xs text-slate-500 dark:text-slate-300">
                 Accuracy: {locationState.coordinates?.accuracy ? `${locationState.coordinates.accuracy}m` : "-"}
               </p>
             </div>
             <div className="surface-muted p-4">
-              <p className="text-xs font-black uppercase text-slate-500 dark:text-blue-200">Map</p>
+              <p className="text-xs font-black uppercase text-slate-500 dark:text-slate-300">Map</p>
               {locationState.coordinates ? (
-                <a className="mt-2 inline-flex items-center gap-1 text-sm font-black text-hya-700" href={googleMapsUrl(locationState.coordinates.latitude, locationState.coordinates.longitude)} target="_blank" rel="noreferrer">
+                <a className="mt-2 inline-flex items-center gap-1 text-sm font-black text-slate-900" href={googleMapsUrl(locationState.coordinates.latitude, locationState.coordinates.longitude)} target="_blank" rel="noreferrer">
                   View Map
                   <ExternalLink className="h-3.5 w-3.5" aria-hidden="true" />
                 </a>
               ) : (
-                <p className="mt-2 text-sm font-black text-slate-950 dark:text-blue-50">Location not available</p>
+                <p className="mt-2 text-sm font-black text-slate-950 dark:text-slate-100">Location not available</p>
               )}
-              <p className="mt-1 flex items-center gap-1 text-xs text-slate-500 dark:text-blue-200">
+              <p className="mt-1 flex items-center gap-1 text-xs text-slate-500 dark:text-slate-300">
                 <MapPin className="h-3.5 w-3.5" aria-hidden="true" />
                 GPS optional
               </p>
             </div>
           </div>
           {locationState.error ? (
-            <div className="mt-4 rounded-lg border border-amber-200 bg-amber-50 p-3 text-sm font-semibold text-amber-800">
+            <div className="mt-4 rounded-lg border border-slate-200 bg-slate-50 p-3 text-sm font-semibold text-slate-900">
               {locationState.error}
             </div>
           ) : null}
         </section>
       ) : (
         <section className="mb-6 panel p-5">
-          <div className="mb-4 border-b border-slate-100 pb-4 dark:border-[#203e6f]">
-            <h2 className="text-base font-black text-slate-950 dark:text-blue-50">Attendance Filters</h2>
-            <p className="mt-1 text-sm text-slate-500 dark:text-blue-200">Date, department, and employee view controls.</p>
+          <div className="mb-4 border-b border-slate-100 pb-4 dark:border-slate-700">
+            <h2 className="text-base font-black text-slate-950 dark:text-slate-100">Attendance Filters</h2>
+            <p className="mt-1 text-sm text-slate-500 dark:text-slate-300">Date, department, and employee view controls.</p>
           </div>
           <div className="grid gap-3 md:grid-cols-4">
             <label className="space-y-1.5">
@@ -198,7 +202,7 @@ export default function AttendancePage() {
               <span className="form-label">Employee ID</span>
               <input
                 className="form-input"
-                placeholder="HYA-DEMO-EMP"
+                placeholder="RAZK-DEMO-EMP"
                 value={filters.employeeId}
                 onChange={(event) => setFilters({ ...filters, employeeId: event.target.value })}
               />
@@ -252,7 +256,7 @@ export default function AttendancePage() {
                     <p className="text-xs text-slate-500">{record.checkInLatitude ?? "-"}, {record.checkInLongitude ?? "-"}</p>
                     <p className="text-xs text-slate-500">Accuracy: {record.checkInAccuracy ?? "-"} m</p>
                     {googleMapsUrl(record.checkInLatitude, record.checkInLongitude) ? (
-                      <a className="mt-1 inline-flex items-center gap-1 text-xs font-bold text-hya-700" href={googleMapsUrl(record.checkInLatitude, record.checkInLongitude)} target="_blank" rel="noreferrer">
+                      <a className="mt-1 inline-flex items-center gap-1 text-xs font-bold text-slate-900" href={googleMapsUrl(record.checkInLatitude, record.checkInLongitude)} target="_blank" rel="noreferrer">
                         View Map <ExternalLink className="h-3 w-3" aria-hidden="true" />
                       </a>
                     ) : null}
@@ -262,7 +266,7 @@ export default function AttendancePage() {
                     <p className="text-xs text-slate-500">{record.checkOutLatitude ?? "-"}, {record.checkOutLongitude ?? "-"}</p>
                     <p className="text-xs text-slate-500">Accuracy: {record.checkOutAccuracy ?? "-"} m</p>
                     {googleMapsUrl(record.checkOutLatitude, record.checkOutLongitude) ? (
-                      <a className="mt-1 inline-flex items-center gap-1 text-xs font-bold text-hya-700" href={googleMapsUrl(record.checkOutLatitude, record.checkOutLongitude)} target="_blank" rel="noreferrer">
+                      <a className="mt-1 inline-flex items-center gap-1 text-xs font-bold text-slate-900" href={googleMapsUrl(record.checkOutLatitude, record.checkOutLongitude)} target="_blank" rel="noreferrer">
                         View Map <ExternalLink className="h-3 w-3" aria-hidden="true" />
                       </a>
                     ) : null}
@@ -316,7 +320,7 @@ export default function AttendancePage() {
                   <p className="mt-1 font-semibold text-slate-950">{record.checkInLocationStatus || "Location not available"}</p>
                   <p className="text-xs text-slate-500">{record.checkInLatitude ?? "-"}, {record.checkInLongitude ?? "-"}</p>
                   {googleMapsUrl(record.checkInLatitude, record.checkInLongitude) ? (
-                    <a className="mt-1 inline-flex items-center gap-1 text-xs font-bold text-hya-700" href={googleMapsUrl(record.checkInLatitude, record.checkInLongitude)} target="_blank" rel="noreferrer">
+                    <a className="mt-1 inline-flex items-center gap-1 text-xs font-bold text-slate-900" href={googleMapsUrl(record.checkInLatitude, record.checkInLongitude)} target="_blank" rel="noreferrer">
                       View Map <ExternalLink className="h-3 w-3" aria-hidden="true" />
                     </a>
                   ) : null}
@@ -326,7 +330,7 @@ export default function AttendancePage() {
                   <p className="mt-1 font-semibold text-slate-950">{record.checkOutLocationStatus || "Location not available"}</p>
                   <p className="text-xs text-slate-500">{record.checkOutLatitude ?? "-"}, {record.checkOutLongitude ?? "-"}</p>
                   {googleMapsUrl(record.checkOutLatitude, record.checkOutLongitude) ? (
-                    <a className="mt-1 inline-flex items-center gap-1 text-xs font-bold text-hya-700" href={googleMapsUrl(record.checkOutLatitude, record.checkOutLongitude)} target="_blank" rel="noreferrer">
+                    <a className="mt-1 inline-flex items-center gap-1 text-xs font-bold text-slate-900" href={googleMapsUrl(record.checkOutLatitude, record.checkOutLongitude)} target="_blank" rel="noreferrer">
                       View Map <ExternalLink className="h-3 w-3" aria-hidden="true" />
                     </a>
                   ) : null}

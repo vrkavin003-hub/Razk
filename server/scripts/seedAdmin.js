@@ -7,7 +7,7 @@ dotenv.config();
 const seedAdmin = async () => {
   await connectDB();
 
-  const adminEmail = "admin@hyatech.com";
+  const adminEmail = "admin@razkautomation.com";
   const existing = await User.findOne({ email: adminEmail });
 
   if (existing) {
@@ -16,21 +16,21 @@ const seedAdmin = async () => {
   }
 
   await User.create({
-    name: "HYA Tech Admin",
+    name: "Razk Automation Admin",
     email: adminEmail,
     password: "Admin@12345",
     role: "admin",
-    employeeId: "HYA-ADMIN-001",
+    employeeId: "RAZK-ADMIN-001",
     department: "Administration",
     designation: "System Administrator",
     phone: "9000000000",
     joiningDate: new Date(),
-    address: "HYA Tech Manufacturing Office",
+    address: "Razk Automation Manufacturing Office",
     emergencyContact: "9000000001"
   });
 
   console.log("Default admin created");
-  console.log("Email: admin@hyatech.com");
+  console.log("Email: admin@razkautomation.com");
   console.log("Password: Admin@12345");
   process.exit(0);
 };

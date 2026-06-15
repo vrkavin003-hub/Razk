@@ -1,6 +1,6 @@
-# HYA Tech SQL Migration Plan
+# Razk Automation SQL Migration Plan
 
-Use this plan when an older SQL Server/MySQL database already exists and must be moved into `hyatech_db`.
+Use this plan when an older SQL Server/MySQL database already exists and must be moved into `razkautomation_db`.
 
 ## 1. Discovery
 
@@ -15,7 +15,7 @@ Use this plan when an older SQL Server/MySQL database already exists and must be
 Before any migration:
 
 ```bash
-mysqldump -h old-host -u old-user -p old_database > backup-before-hyatech-migration.sql
+mysqldump -h old-host -u old-user -p old_database > backup-before-razk-migration.sql
 ```
 
 For SQL Server, create a full `.bak` backup and a CSV export for mapping validation.
@@ -34,7 +34,7 @@ Map legacy fields into the new normalized schema:
 
 ## 4. Staging Migration
 
-- Create a staging copy of `hyatech_db`.
+- Create a staging copy of `razkautomation_db`.
 - Load transformed data into staging first.
 - Validate row counts and random sample records.
 - Run API smoke tests against staging.
@@ -57,7 +57,7 @@ Map legacy fields into the new normalized schema:
 3. Run final migration.
 4. Validate counts and spot checks.
 5. Update backend `.env` to point to production MySQL.
-6. Start HYA Tech API.
+6. Start Razk Automation API.
 7. Run admin login, contact submit, career submit, notification, and report tests.
 
 ## 7. Rollback

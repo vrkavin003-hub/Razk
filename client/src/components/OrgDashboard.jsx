@@ -28,10 +28,10 @@ import Loading from "./Loading";
 import PageHeader from "./PageHeader";
 import StatCard from "./StatCard";
 
-const leaveColors = ["#f59e0b", "#10b981", "#e11d48"];
-const chartGrid = "#dbe5ef";
+const leaveColors = ["#64748b", "#475569", "#0f172a"];
+const chartGrid = "#cbd5e1";
 const tooltipStyle = {
-  border: "1px solid #dbe5ef",
+  border: "1px solid #cbd5e1",
   borderRadius: 8,
   boxShadow: "0 16px 40px rgba(15, 23, 42, 0.12)"
 };
@@ -64,39 +64,39 @@ export default function OrgDashboard({ endpoint, title }) {
     <>
       <PageHeader
         title={title}
-        description="Live attendance, approvals, department movement, and monthly health for HYA Tech."
+        description="Live attendance, approvals, department movement, and monthly health for Razk Automation."
       />
       <section className="mb-6 grid gap-4 lg:grid-cols-[1fr_320px]">
         <div className="panel p-5">
           <div className="flex flex-col gap-5 md:flex-row md:items-center md:justify-between">
             <div>
-              <p className="text-xs font-black uppercase tracking-[0.18em] text-hya-600 dark:text-blue-300">
+              <p className="text-xs font-black uppercase tracking-[0.18em] text-slate-500 dark:text-slate-400">
                 Operations Health
               </p>
-              <h2 className="mt-2 text-xl font-black text-slate-950 dark:text-blue-50">
+              <h2 className="mt-2 text-xl font-black text-slate-950 dark:text-slate-100">
                 {cards.monthlyAttendancePercentage || 0}% monthly attendance
               </h2>
-              <p className="mt-2 max-w-2xl text-sm leading-6 text-slate-500 dark:text-blue-200">
+              <p className="mt-2 max-w-2xl text-sm leading-6 text-slate-500 dark:text-slate-300">
                 {cards.presentToday || 0} present today across {cards.totalDepartments || 0} active departments.
               </p>
             </div>
             <div className="grid grid-cols-2 gap-3 text-sm">
               <div className="surface-muted p-4">
-                <p className="text-xs font-bold uppercase text-slate-500 dark:text-blue-200">Pending</p>
-                <p className="mt-2 text-2xl font-black text-amber-600 dark:text-amber-200">{pendingTotal}</p>
+                <p className="text-xs font-bold uppercase text-slate-500 dark:text-slate-300">Pending</p>
+                <p className="mt-2 text-2xl font-black text-slate-950 dark:text-slate-100">{pendingTotal}</p>
               </div>
               <div className="surface-muted p-4">
-                <p className="text-xs font-bold uppercase text-slate-500 dark:text-blue-200">Late</p>
-                <p className="mt-2 text-2xl font-black text-rose-600 dark:text-rose-200">{cards.lateToday || 0}</p>
+                <p className="text-xs font-bold uppercase text-slate-500 dark:text-slate-300">Late</p>
+                <p className="mt-2 text-2xl font-black text-slate-950 dark:text-slate-100">{cards.lateToday || 0}</p>
               </div>
             </div>
           </div>
         </div>
         <div className="panel p-5">
-          <p className="text-sm font-black text-slate-950 dark:text-blue-50">Today Coverage</p>
-          <div className="mt-4 h-3 overflow-hidden rounded-full bg-slate-100 dark:bg-[#09192e]">
+          <p className="text-sm font-black text-slate-950 dark:text-slate-100">Today Coverage</p>
+          <div className="mt-4 h-3 overflow-hidden rounded-full bg-slate-100 dark:bg-slate-800">
             <div
-              className="h-full rounded-full bg-emerald-500"
+              className="h-full rounded-full bg-slate-700"
               style={{
                 width: `${Math.min(
                   100,
@@ -106,8 +106,8 @@ export default function OrgDashboard({ endpoint, title }) {
             />
           </div>
           <div className="mt-4 flex items-center justify-between text-sm">
-            <span className="font-semibold text-slate-500 dark:text-blue-200">Present</span>
-            <span className="font-black text-slate-950 dark:text-blue-50">
+            <span className="font-semibold text-slate-500 dark:text-slate-300">Present</span>
+            <span className="font-black text-slate-950 dark:text-slate-100">
               {cards.presentToday || 0}/{cards.totalEmployees || 0}
             </span>
           </div>
@@ -120,9 +120,9 @@ export default function OrgDashboard({ endpoint, title }) {
       </section>
       <section className="mt-6 grid gap-6 xl:grid-cols-3">
         <div className="panel overflow-hidden xl:col-span-2">
-          <div className="border-b border-slate-100 px-5 py-4 dark:border-[#203e6f]">
-            <h2 className="text-base font-black text-slate-950 dark:text-blue-50">Weekly Attendance</h2>
-            <p className="mt-1 text-sm text-slate-500 dark:text-blue-200">Present, late, and absent movement.</p>
+          <div className="border-b border-slate-100 px-5 py-4 dark:border-slate-700">
+            <h2 className="text-base font-black text-slate-950 dark:text-slate-100">Weekly Attendance</h2>
+            <p className="mt-1 text-sm text-slate-500 dark:text-slate-300">Present, late, and absent movement.</p>
           </div>
           <div className="h-80 p-5">
             <ResponsiveContainer width="100%" height="100%">
@@ -132,17 +132,17 @@ export default function OrgDashboard({ endpoint, title }) {
                 <YAxis allowDecimals={false} tick={{ fontSize: 12 }} />
                 <Tooltip contentStyle={tooltipStyle} cursor={{ fill: "rgba(37, 99, 235, 0.08)" }} />
                 <Legend />
-                <Bar dataKey="present" fill="#2563eb" radius={[6, 6, 0, 0]} />
-                <Bar dataKey="late" fill="#f59e0b" radius={[6, 6, 0, 0]} />
-                <Bar dataKey="absent" fill="#e11d48" radius={[6, 6, 0, 0]} />
+                <Bar dataKey="present" fill="#64748b" radius={[6, 6, 0, 0]} />
+                <Bar dataKey="late" fill="#94a3b8" radius={[6, 6, 0, 0]} />
+                <Bar dataKey="absent" fill="#0f172a" radius={[6, 6, 0, 0]} />
               </BarChart>
             </ResponsiveContainer>
           </div>
         </div>
         <div className="panel overflow-hidden">
-          <div className="border-b border-slate-100 px-5 py-4 dark:border-[#203e6f]">
-            <h2 className="text-base font-black text-slate-950 dark:text-blue-50">Leave Status</h2>
-            <p className="mt-1 text-sm text-slate-500 dark:text-blue-200">Current request mix.</p>
+          <div className="border-b border-slate-100 px-5 py-4 dark:border-slate-700">
+            <h2 className="text-base font-black text-slate-950 dark:text-slate-100">Leave Status</h2>
+            <p className="mt-1 text-sm text-slate-500 dark:text-slate-300">Current request mix.</p>
           </div>
           <div className="h-80 p-5">
             <ResponsiveContainer width="100%" height="100%">
@@ -167,9 +167,9 @@ export default function OrgDashboard({ endpoint, title }) {
         </div>
       </section>
       <section className="mt-6 panel overflow-hidden">
-        <div className="border-b border-slate-100 px-5 py-4 dark:border-[#203e6f]">
-          <h2 className="text-base font-black text-slate-950 dark:text-blue-50">Department Attendance Today</h2>
-          <p className="mt-1 text-sm text-slate-500 dark:text-blue-200">Department-level presence and gap view.</p>
+        <div className="border-b border-slate-100 px-5 py-4 dark:border-slate-700">
+          <h2 className="text-base font-black text-slate-950 dark:text-slate-100">Department Attendance Today</h2>
+          <p className="mt-1 text-sm text-slate-500 dark:text-slate-300">Department-level presence and gap view.</p>
         </div>
         <div className="overflow-x-auto">
           <table className="min-w-full">
@@ -184,10 +184,10 @@ export default function OrgDashboard({ endpoint, title }) {
             <tbody>
               {(dashboard.departmentAttendance || []).map((row) => (
                 <tr key={row.department}>
-                  <td className="table-cell font-semibold text-slate-900 dark:text-blue-50">{row.department}</td>
+                  <td className="table-cell font-semibold text-slate-900 dark:text-slate-100">{row.department}</td>
                   <td className="table-cell">{row.total}</td>
-                  <td className="table-cell text-emerald-700">{row.present}</td>
-                  <td className="table-cell text-rose-700">{row.absent}</td>
+                  <td className="table-cell text-slate-900">{row.present}</td>
+                  <td className="table-cell text-slate-900">{row.absent}</td>
                 </tr>
               ))}
             </tbody>

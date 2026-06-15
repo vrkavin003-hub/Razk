@@ -36,11 +36,12 @@ export default function NotificationBell() {
     return () => document.removeEventListener("mousedown", close);
   }, []);
 
-  const markRead = async (notification) => {
-    if (notification.isRead) return;
+  const dismissNotification = async (notification) => {
     try {
-      await api.put(`/notifications/${notification._id}/read`);
-      await loadNotifications();
+      if (!notification.isRead) await api.put(`/notifications/${notification._id}/read`);
+      await api.delete(`/notifications/${notification._id}`);
+      setNotifications((current) => current.filter((item) => item._id !== notification._id));
+      if (!notification.isRead) setUnreadCount((current) => Math.max(current - 1, 0));
     } catch (error) {
       toast.error(error.message);
     }
@@ -71,26 +72,26 @@ export default function NotificationBell() {
     <div className="relative" ref={wrapperRef}>
       <button
         aria-label="Notifications"
-        className="relative inline-grid h-10 w-10 place-items-center rounded-lg border border-slate-200 bg-white text-slate-700 shadow-sm shadow-slate-900/5 transition hover:border-slate-300 hover:bg-slate-50 focus:outline-none focus:ring-4 focus:ring-slate-100 dark:border-[#24456f] dark:bg-[#0c1f3d] dark:text-blue-100 dark:shadow-none dark:hover:bg-[#123052] dark:focus:ring-blue-950"
+        className="relative inline-grid h-10 w-10 place-items-center rounded-lg border border-slate-200 bg-white text-slate-700 shadow-sm shadow-slate-900/5 transition hover:border-slate-300 hover:bg-slate-50 focus:outline-none focus:ring-4 focus:ring-slate-100 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100 dark:shadow-none dark:hover:bg-slate-800 dark:focus:ring-slate-600"
         onClick={() => setOpen((current) => !current)}
         type="button"
       >
         <Bell className="h-5 w-5" aria-hidden="true" />
         {unreadCount ? (
-          <span className="absolute -right-1 -top-1 grid min-h-5 min-w-5 place-items-center rounded-full bg-rose-600 px-1 text-xs font-black text-white">
+          <span className="absolute -right-1 -top-1 grid min-h-5 min-w-5 place-items-center rounded-full bg-slate-800 px-1 text-xs font-black text-white">
             {unreadCount > 9 ? "9+" : unreadCount}
           </span>
         ) : null}
       </button>
       {open ? (
-        <div className="absolute right-0 top-12 z-50 w-[min(92vw,400px)] overflow-hidden rounded-lg border border-slate-200 bg-white shadow-panel dark:border-[#203e6f] dark:bg-[#0c1f3d] dark:shadow-none">
-          <div className="flex items-center justify-between border-b border-slate-100 px-4 py-3 dark:border-[#203e6f]">
+        <div className="absolute right-0 top-12 z-50 w-[min(92vw,400px)] overflow-hidden rounded-lg border border-slate-200 bg-white shadow-panel dark:border-slate-700 dark:bg-slate-900 dark:shadow-none">
+          <div className="flex items-center justify-between border-b border-slate-100 px-4 py-3 dark:border-slate-700">
             <div>
-              <p className="text-sm font-black text-slate-950 dark:text-blue-50">Notifications</p>
-              <p className="text-xs text-slate-500 dark:text-blue-200">{unreadCount} unread</p>
+              <p className="text-sm font-black text-slate-950 dark:text-slate-100">Notifications</p>
+              <p className="text-xs text-slate-500 dark:text-slate-300">{unreadCount} unread</p>
             </div>
             <button
-              className="inline-flex items-center gap-1 rounded-md px-2 py-1 text-xs font-bold text-hya-700 hover:bg-hya-50 disabled:opacity-50 dark:text-blue-200 dark:hover:bg-[#102a57]"
+              className="inline-flex items-center gap-1 rounded-md px-2 py-1 text-xs font-bold text-slate-900 hover:bg-slate-50 disabled:opacity-50 dark:text-slate-300 dark:hover:bg-slate-800"
               disabled={loading || unreadCount === 0}
               onClick={markAllRead}
               type="button"
@@ -102,34 +103,34 @@ export default function NotificationBell() {
             {notifications.length ? (
               notifications.map((notification) => (
                 <div
-                  className={`flex items-start border-b border-slate-100 transition hover:bg-slate-50 dark:border-[#203e6f] dark:hover:bg-[#123052] ${
-                    notification.isRead ? "bg-white dark:bg-[#0c1f3d]" : "bg-hya-50/60 dark:bg-[#123052]"
+                  className={`flex items-start border-b border-slate-100 transition hover:bg-slate-50 dark:border-slate-700 dark:hover:bg-slate-800 ${
+                    notification.isRead ? "bg-white dark:bg-slate-900" : "bg-slate-100/80 dark:bg-slate-800"
                   }`}
                   key={notification._id}
                 >
                   <button
                     className="flex min-w-0 flex-1 items-start gap-3 px-4 py-3 text-left"
-                    onClick={() => markRead(notification)}
+                    onClick={() => dismissNotification(notification)}
                     type="button"
                   >
                     <span
                       className={`mt-1 h-2.5 w-2.5 shrink-0 rounded-full ${
-                        notification.isRead ? "bg-slate-300 dark:bg-blue-900" : "bg-hya-600 dark:bg-blue-300"
+                        notification.isRead ? "bg-slate-300 dark:bg-slate-600" : "bg-slate-700 dark:bg-slate-300"
                       }`}
                     />
                     <span className="min-w-0 flex-1">
-                      <span className="block text-sm font-black text-slate-950 dark:text-blue-50">{notification.title}</span>
-                      <span className="mt-1 block line-clamp-2 text-xs leading-5 text-slate-600 dark:text-blue-100">
+                      <span className="block text-sm font-black text-slate-950 dark:text-slate-100">{notification.title}</span>
+                      <span className="mt-1 block line-clamp-2 text-xs leading-5 text-slate-600 dark:text-slate-100">
                         {notification.message}
                       </span>
-                      <span className="mt-2 block text-xs font-semibold text-slate-400 dark:text-blue-300">
+                      <span className="mt-2 block text-xs font-semibold text-slate-400 dark:text-slate-300">
                         {notification.createdBy?.name || "System"} | <TimeAgo value={notification.createdAt} />
                       </span>
                     </span>
                   </button>
                   <button
                     aria-label="Delete notification"
-                    className="mr-3 mt-3 rounded-lg p-1 text-slate-400 transition hover:bg-white hover:text-rose-600 focus:outline-none focus:ring-4 focus:ring-rose-100 dark:text-blue-300 dark:hover:bg-[#0c1f3d] dark:hover:text-rose-300"
+                    className="mr-3 mt-3 rounded-lg p-1 text-slate-400 transition hover:bg-white hover:text-slate-900 focus:outline-none focus:ring-4 focus:ring-slate-200 dark:text-slate-300 dark:hover:bg-slate-800 dark:hover:text-slate-100"
                     onClick={(event) => {
                       event.stopPropagation();
                       removeNotification(notification);
@@ -141,7 +142,7 @@ export default function NotificationBell() {
                 </div>
               ))
             ) : (
-              <div className="px-4 py-8 text-center text-sm text-slate-500 dark:text-blue-200">
+              <div className="px-4 py-8 text-center text-sm text-slate-500 dark:text-slate-300">
                 No notifications yet
               </div>
             )}

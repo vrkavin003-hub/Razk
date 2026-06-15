@@ -6,7 +6,7 @@ const { query } = require("../db");
 const toCsv = require("../../utils/csv");
 const { optionalDate } = require("../utils/validation");
 
-const logoPath = path.join(__dirname, "..", "..", "assets", "hya-logo.png");
+const logoPath = path.join(__dirname, "..", "..", "assets", "razk-logo.jpeg");
 
 const reportDefinitions = {
   "contact-messages": {
@@ -112,7 +112,7 @@ const sendCsv = (res, definition, rows) => {
 
 const sendExcel = async (res, definition, rows) => {
   const workbook = new ExcelJS.Workbook();
-  workbook.creator = "HYA Tech";
+  workbook.creator = "Razk Automation";
   const sheet = workbook.addWorksheet(definition.title);
   sheet.addRow(definition.columns.map((column) => column.replace(/_/g, " ").toUpperCase()));
   rows.forEach((row) => sheet.addRow(definition.columns.map((column) => row[column] ?? "")));
@@ -133,7 +133,7 @@ const sendPdf = (res, definition, rows) => {
   doc.pipe(res);
 
   if (fs.existsSync(logoPath)) doc.image(logoPath, 42, 32, { width: 48 });
-  doc.fontSize(18).font("Helvetica-Bold").text("HYA Tech", 100, 36);
+  doc.fontSize(18).font("Helvetica-Bold").text("Razk Automation", 100, 36);
   doc.fontSize(11).font("Helvetica").fillColor("#475569").text("Enterprise Operations Report", 100, 60);
   doc.fillColor("#0f172a").fontSize(15).font("Helvetica-Bold").text(definition.title, 42, 105);
   doc.fontSize(9).font("Helvetica").fillColor("#64748b").text(`Generated: ${new Date().toLocaleString("en-IN")}`, 42, 126);
@@ -163,7 +163,7 @@ const sendPdf = (res, definition, rows) => {
     y += rowIndex % 2 === 0 ? 20 : 18;
   });
 
-  doc.fontSize(8).fillColor("#94a3b8").text("HYA Tech | Confidential", 42, 780);
+  doc.fontSize(8).fillColor("#94a3b8").text("Razk Automation | Confidential", 42, 780);
   doc.end();
 };
 

@@ -1,6 +1,0 @@
--- Primary schema migration for HYA Tech.
--- Run from the project root with:
--- mysql -u root -p < server/database/schema.sql
---
--- The canonical schema is kept in server/database/schema.sql so it can be
--- used by local setup, CI, and production provisioning without drift.

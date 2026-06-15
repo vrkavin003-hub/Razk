@@ -11,7 +11,7 @@ export default function UserAvatar({ className = "", name = "", photo = "", size
   const src = mediaUrl(photo);
 
   return (
-    <span className={`grid shrink-0 place-items-center overflow-hidden rounded-lg bg-hya-600 font-black text-white ring-1 ring-slate-200 ${sizes[size] || sizes.md} ${className}`}>
+    <span className={`grid shrink-0 place-items-center overflow-hidden rounded-lg bg-slate-700 font-black text-white ring-1 ring-slate-200 dark:bg-slate-200 dark:text-slate-950 ${sizes[size] || sizes.md} ${className}`}>
       {src ? <img alt={name || "User"} className="h-full w-full object-cover" src={src} /> : name ? initials(name) : <UserRound className="h-4 w-4" aria-hidden="true" />}
     </span>
   );

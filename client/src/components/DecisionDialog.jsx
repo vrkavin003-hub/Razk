@@ -39,9 +39,9 @@ export default function DecisionDialog({
         role="dialog"
       >
         <div>
-          <p className="text-xs font-black uppercase tracking-[0.18em] text-hya-600 dark:text-blue-300">Decision</p>
-          <h2 className="mt-2 text-xl font-black text-slate-950 dark:text-blue-50">{title}</h2>
-          {body ? <p className="mt-2 text-sm leading-6 text-slate-500 dark:text-blue-200">{body}</p> : null}
+          <p className="text-xs font-black uppercase tracking-[0.18em] text-slate-900 dark:text-slate-100">Decision</p>
+          <h2 className="mt-2 text-xl font-black text-slate-950 dark:text-slate-100">{title}</h2>
+          {body ? <p className="mt-2 text-sm leading-6 text-slate-500 dark:text-slate-300">{body}</p> : null}
         </div>
         <label className="mt-5 block space-y-1.5">
           <span className="form-label">Remarks</span>

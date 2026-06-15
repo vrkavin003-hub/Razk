@@ -108,7 +108,7 @@ export default function EmployeeProfile() {
 
       <form className="panel mt-6 max-w-3xl p-5" onSubmit={submitPassword}>
         <div className="flex items-center gap-3">
-          <span className="grid h-10 w-10 place-items-center rounded-lg bg-hya-50 text-hya-700 ring-1 ring-hya-100">
+          <span className="grid h-10 w-10 place-items-center rounded-lg bg-slate-50 text-slate-900 ring-1 ring-slate-200">
             <KeyRound className="h-5 w-5" aria-hidden="true" />
           </span>
           <div>

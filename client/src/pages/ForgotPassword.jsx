@@ -42,7 +42,7 @@ export default function ForgotPassword() {
           {loading ? "Generating..." : "Generate Reset Token"}
         </Button>
         {resetToken ? (
-          <div className="mt-4 rounded-md bg-hya-50 p-3 text-sm font-semibold text-hya-900">
+          <div className="mt-4 rounded-md bg-slate-50 p-3 text-sm font-semibold text-slate-950">
             Reset token: {resetToken}
           </div>
         ) : null}

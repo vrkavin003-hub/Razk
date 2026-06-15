@@ -1,6 +1,6 @@
 # Attendance Location Capture
 
-HYA Tech attendance can be marked from any location. The app still tries to capture GPS details during check-in and check-out for reporting.
+Razk Automation attendance can be marked from any location. The app still tries to capture GPS details during check-in and check-out for reporting.
 
 ## Admin Setup
 

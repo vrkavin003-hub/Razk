@@ -48,10 +48,10 @@ export default function EmployeesList() {
         }
       />
       <div className="panel p-5">
-        <div className="mb-5 flex flex-col gap-4 border-b border-slate-100 pb-5 sm:flex-row sm:items-end sm:justify-between dark:border-[#203e6f]">
+        <div className="mb-5 flex flex-col gap-4 border-b border-slate-100 pb-5 sm:flex-row sm:items-end sm:justify-between dark:border-slate-700">
           <div>
-            <h2 className="text-base font-black text-slate-950 dark:text-blue-50">Employee Directory</h2>
-            <p className="mt-1 text-sm text-slate-500 dark:text-blue-200">{employees.length} active records</p>
+            <h2 className="text-base font-black text-slate-950 dark:text-slate-100">Employee Directory</h2>
+            <p className="mt-1 text-sm text-slate-500 dark:text-slate-300">{employees.length} active records</p>
           </div>
           <div className="flex w-full flex-col gap-3 sm:max-w-xl sm:flex-row">
             <div className="relative flex-1">
@@ -88,12 +88,12 @@ export default function EmployeesList() {
                 <tr key={employee._id}>
                   <td className="table-cell">
                     <div className="flex items-center gap-3">
-                      <span className="grid h-10 w-10 shrink-0 place-items-center rounded-lg bg-slate-950 text-xs font-black text-white dark:bg-blue-500">
+                      <span className="grid h-10 w-10 shrink-0 place-items-center rounded-lg bg-slate-950 text-xs font-black text-white dark:bg-slate-700">
                         {initials(employee.name)}
                       </span>
                       <div className="min-w-0">
-                        <p className="truncate font-black text-slate-950 dark:text-blue-50">{employee.name}</p>
-                        <p className="truncate text-xs font-semibold text-slate-500 dark:text-blue-200">
+                        <p className="truncate font-black text-slate-950 dark:text-slate-100">{employee.name}</p>
+                        <p className="truncate text-xs font-semibold text-slate-500 dark:text-slate-300">
                           {employee.employeeId} | {employee.email}
                         </p>
                       </div>

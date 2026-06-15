@@ -9,7 +9,7 @@ export default function ProtectedRoute({ roles }) {
 
   if (!authReady) {
     return (
-      <main className="grid min-h-screen place-items-center bg-[#f5f7fb] px-4">
+      <main className="grid min-h-screen place-items-center bg-slate-50 px-4 dark:bg-slate-950">
         <Loading label="Checking secure session" />
       </main>
     );

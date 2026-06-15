@@ -1,0 +1,273 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Razk Automation Mobile Preview</title>
+    <style>
+      * {
+        box-sizing: border-box;
+      }
+
+      body {
+        margin: 0;
+        min-height: 844px;
+        background: #e7dfd2;
+        color: #2f3032;
+        font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      }
+
+      .phone {
+        width: 100vw;
+        max-width: 390px;
+        height: 844px;
+        overflow: hidden;
+        background: #f5f1e8;
+      }
+
+      .hero {
+        position: relative;
+        min-height: 360px;
+        padding: 26px 22px;
+        background: #3b3935;
+        color: #fffaf2;
+        overflow: hidden;
+      }
+
+      .hero::before {
+        content: "";
+        position: absolute;
+        inset: 0;
+        opacity: 0.18;
+        background-image:
+          linear-gradient(120deg, rgb(255 250 242 / 0.22) 1px, transparent 1px),
+          linear-gradient(30deg, rgb(255 250 242 / 0.12) 1px, transparent 1px);
+        background-size: 48px 48px;
+      }
+
+      .content {
+        position: relative;
+        z-index: 1;
+      }
+
+      .brand {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+      }
+
+      .logoTile {
+        display: grid;
+        place-items: center;
+        width: 46px;
+        height: 46px;
+        border-radius: 10px;
+        background: #fffdf8;
+        border: 1px solid #d8d0c3;
+        box-shadow: 0 12px 30px rgb(0 0 0 / 0.12);
+      }
+
+      .logoTile img {
+        width: 34px;
+        height: 34px;
+        object-fit: contain;
+      }
+
+      .brandName {
+        margin: 0;
+        font-size: 16px;
+        line-height: 1.1;
+        font-weight: 900;
+      }
+
+      .brandSub {
+        margin: 4px 0 0;
+        color: #d8d0c3;
+        font-size: 12px;
+        font-weight: 700;
+      }
+
+      .pill {
+        display: inline-flex;
+        align-items: center;
+        margin-top: 30px;
+        padding: 8px 12px;
+        border-radius: 999px;
+        background: rgb(255 250 242 / 0.1);
+        border: 1px solid rgb(255 250 242 / 0.15);
+        color: #f7f2e8;
+        font-size: 12px;
+        font-weight: 800;
+      }
+
+      h1 {
+        margin: 18px 0 0;
+        max-width: 320px;
+        font-size: 36px;
+        line-height: 1.03;
+        letter-spacing: 0;
+      }
+
+      .copy {
+        margin: 16px 0 0;
+        max-width: 330px;
+        color: #ebe3d6;
+        font-size: 15px;
+        line-height: 1.55;
+        font-weight: 500;
+      }
+
+      .metrics {
+        display: grid;
+        grid-template-columns: repeat(3, 1fr);
+        gap: 9px;
+        margin-top: 22px;
+      }
+
+      .metric {
+        min-height: 82px;
+        border-radius: 12px;
+        padding: 11px;
+        background: rgb(255 250 242 / 0.1);
+        border: 1px solid rgb(255 250 242 / 0.15);
+      }
+
+      .metric small {
+        display: block;
+        color: #d8d0c3;
+        font-size: 10px;
+        font-weight: 800;
+        text-transform: uppercase;
+      }
+
+      .metric b {
+        display: block;
+        margin-top: 12px;
+        color: #fffaf2;
+        font-size: 17px;
+      }
+
+      .login {
+        margin: -24px 18px 0;
+        position: relative;
+        z-index: 2;
+        padding: 18px;
+        border-radius: 12px;
+        background: #fbfaf6;
+        border: 1px solid #d8d0c3;
+        box-shadow: 0 18px 48px rgb(47 48 50 / 0.12);
+      }
+
+      .login .brand {
+        margin-bottom: 16px;
+      }
+
+      .eyebrow {
+        margin: 0;
+        color: #6f6b65;
+        font-size: 11px;
+        font-weight: 900;
+        letter-spacing: 0.18em;
+        text-transform: uppercase;
+      }
+
+      h2 {
+        margin: 8px 0 0;
+        font-size: 28px;
+        line-height: 1.1;
+      }
+
+      .hint {
+        margin: 8px 0 16px;
+        color: #77736c;
+        font-size: 14px;
+        line-height: 1.5;
+      }
+
+      label {
+        display: block;
+        margin-top: 14px;
+        color: #4b4c4f;
+        font-size: 13px;
+        font-weight: 800;
+      }
+
+      .input {
+        display: flex;
+        align-items: center;
+        height: 44px;
+        margin-top: 6px;
+        padding: 0 12px;
+        border-radius: 10px;
+        background: #fffdf8;
+        border: 1px solid #d8d0c3;
+        color: #9b958b;
+        font-size: 14px;
+      }
+
+      .button {
+        display: grid;
+        place-items: center;
+        height: 46px;
+        margin-top: 22px;
+        border-radius: 10px;
+        background: #6f6b65;
+        color: #fffaf2;
+        font-size: 14px;
+        font-weight: 900;
+      }
+
+      .secure {
+        margin-top: 14px;
+        padding: 12px;
+        border-radius: 10px;
+        background: #f2eee6;
+        border: 1px solid #d8d0c3;
+        color: #77736c;
+        font-size: 12px;
+        line-height: 1.45;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="phone">
+      <section class="hero">
+        <div class="content">
+          <div class="brand">
+            <span class="logoTile"><img src="client/public/razk-logo.jpeg" alt="Razk Automation logo" /></span>
+            <span>
+              <p class="brandName">Razk Automation</p>
+              <p class="brandSub">Employee Management</p>
+            </span>
+          </div>
+          <span class="pill">Razk Automation Operations</span>
+          <h1>Razk Automation HRMS</h1>
+          <p class="copy">Attendance, approvals, technician records, and branded reports for automation office and field teams.</p>
+          <div class="metrics">
+            <div class="metric"><small>Attendance</small><b>Live</b></div>
+            <div class="metric"><small>Approvals</small><b>Queued</b></div>
+            <div class="metric"><small>Field Teams</small><b>Synced</b></div>
+          </div>
+        </div>
+      </section>
+      <section class="login">
+        <div class="brand">
+          <span class="logoTile"><img src="client/public/razk-logo.jpeg" alt="Razk Automation logo" /></span>
+          <span>
+            <p class="brandName">Razk Automation</p>
+            <p class="brandSub">Employee Management</p>
+          </span>
+        </div>
+        <p class="eyebrow">Secure Login</p>
+        <h2>Welcome back</h2>
+        <p class="hint">Sign in with your Razk Automation email or login ID.</p>
+        <label>Email / Login ID</label>
+        <div class="input">admin@razkautomation.com</div>
+        <label>Password</label>
+        <div class="input">••••••••••••</div>
+        <div class="button">Sign in</div>
+        <div class="secure"><b>Secure access:</b> Use your assigned Razk Automation credentials.</div>
+      </section>
+    </div>
+  </body>
+</html>

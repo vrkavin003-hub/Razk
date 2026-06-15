@@ -1,6 +1,6 @@
-# HYA Tech SQL Database Schema
+# Razk Automation SQL Database Schema
 
-Production database name: `hyatech_db`
+Production database name: `razkautomation_db`
 
 Canonical SQL script:
 

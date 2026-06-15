@@ -55,7 +55,7 @@ const navSections = ["Overview", "People", "Operations", "Requests", "Comms", "A
 
 const initialTheme = () => {
   try {
-    return localStorage.getItem("hya_theme") || "light";
+    return localStorage.getItem("razk_theme") || "light";
   } catch {
     return "light";
   }
@@ -97,7 +97,7 @@ export default function AppLayout() {
   useEffect(() => {
     document.documentElement.classList.toggle("dark", theme === "dark");
     document.documentElement.style.colorScheme = theme === "dark" ? "dark" : "light";
-    localStorage.setItem("hya_theme", theme);
+    localStorage.setItem("razk_theme", theme);
   }, [theme]);
 
   useEffect(() => {
@@ -130,16 +130,19 @@ export default function AppLayout() {
   }, [location.pathname]);
 
   const menuBadge = (path) => {
+    const managerRole = roleMatches(user?.role, ["admin", "hr"]);
     if (path === "/leave") {
-      return roleMatches(user?.role, ["admin", "hr"]) ? counts.pendingLeaveCount : counts.leaveUpdateCount;
+      return managerRole
+        ? (counts.pendingLeaveCount || 0) + (counts.leaveUpdateCount || 0)
+        : counts.leaveUpdateCount;
     }
     if (path === "/permission") {
-      return roleMatches(user?.role, ["admin", "hr"])
-        ? counts.pendingPermissionCount
+      return managerRole
+        ? (counts.pendingPermissionCount || 0) + (counts.permissionUpdateCount || 0)
         : counts.permissionUpdateCount;
     }
     if (path === "/od") {
-      return roleMatches(user?.role, ["admin", "hr"]) ? counts.pendingODCount : counts.odUpdateCount;
+      return managerRole ? (counts.pendingODCount || 0) + (counts.odUpdateCount || 0) : counts.odUpdateCount;
     }
     if (path === "/dri/assigned-requests") {
       return (counts.pendingLeaveCount || 0) + (counts.pendingPermissionCount || 0) + (counts.pendingODCount || 0);
@@ -162,17 +165,17 @@ export default function AppLayout() {
   const currentLabel = activeItem ? menuLabel(activeItem) : "Workspace";
 
   const sidebar = (
-    <aside className="flex h-full w-72 flex-col border-r border-slate-200 bg-white/95 backdrop-blur dark:border-[#203e6f] dark:bg-[#09192e]">
-      <div className="flex h-20 items-center gap-3 border-b border-slate-100 px-5 dark:border-[#203e6f]">
+    <aside className="flex h-full w-72 flex-col border-r border-slate-200 bg-white/95 backdrop-blur dark:border-slate-700 dark:bg-slate-950">
+      <div className="flex h-20 items-center gap-3 border-b border-slate-100 px-5 dark:border-slate-700">
         <CompanyLogo />
-        <span className="ml-auto rounded-full bg-emerald-50 px-2.5 py-1 text-[11px] font-black uppercase text-emerald-700 ring-1 ring-emerald-100 dark:bg-emerald-950 dark:text-emerald-200 dark:ring-emerald-800">
+        <span className="ml-auto rounded-full bg-slate-100 px-2.5 py-1 text-[11px] font-black uppercase text-slate-900 ring-1 ring-slate-200 dark:bg-slate-800 dark:text-slate-100 dark:ring-slate-700">
           Live
         </span>
       </div>
       <nav className="thin-scrollbar flex-1 overflow-y-auto px-3 py-4">
         {groupedItems.map(([section, sectionItems]) => (
           <div className="mb-5 last:mb-0" key={section}>
-            <p className="mb-2 px-3 text-[11px] font-black uppercase tracking-[0.16em] text-slate-400 dark:text-blue-300">
+            <p className="mb-2 px-3 text-[11px] font-black uppercase tracking-[0.16em] text-slate-400 dark:text-slate-300">
               {section}
             </p>
             <div className="space-y-1">
@@ -183,20 +186,20 @@ export default function AppLayout() {
                     className={({ isActive }) =>
                       `group relative flex min-h-11 items-center gap-3 rounded-lg px-3 text-sm font-bold transition duration-200 ${
                         isActive
-                          ? "bg-hya-50 text-hya-700 ring-1 ring-hya-100 dark:bg-[#123b66] dark:text-blue-50 dark:ring-[#24456f]"
-                          : "text-slate-600 hover:bg-slate-50 hover:text-slate-950 dark:text-blue-200 dark:hover:bg-[#123052] dark:hover:text-blue-50"
+                          ? "bg-slate-100 text-slate-950 ring-1 ring-slate-200 dark:bg-slate-800 dark:text-slate-100 dark:ring-slate-700"
+                          : "text-slate-600 hover:bg-slate-50 hover:text-slate-950 dark:text-slate-300 dark:hover:bg-slate-800 dark:hover:text-slate-100"
                       }`
                     }
                     key={`${item.path}-${item.label}`}
                     onClick={() => setOpen(false)}
                     to={item.path}
                   >
-                    <span className="grid h-8 w-8 place-items-center rounded-lg bg-white text-slate-500 ring-1 ring-slate-200 transition group-hover:text-hya-700 dark:bg-[#0c1f3d] dark:text-blue-200 dark:ring-[#24456f]">
+                    <span className="grid h-8 w-8 place-items-center rounded-lg bg-white text-slate-500 ring-1 ring-slate-200 transition group-hover:text-slate-900 dark:bg-slate-800 dark:text-slate-100 dark:ring-slate-700">
                       <Icon className="h-4 w-4" aria-hidden="true" />
                     </span>
                     <span className="min-w-0 flex-1 truncate">{menuLabel(item)}</span>
                     {menuBadge(item.path) ? (
-                      <span className="grid min-h-5 min-w-5 place-items-center rounded-full bg-amber-500 px-1.5 text-xs font-black text-white dark:bg-amber-400 dark:text-blue-950">
+                      <span className="grid min-h-5 min-w-5 place-items-center rounded-full bg-slate-900 px-1.5 text-xs font-black text-white dark:bg-slate-100 dark:text-slate-950">
                         {menuBadge(item.path) > 9 ? "9+" : menuBadge(item.path)}
                       </span>
                     ) : null}
@@ -207,22 +210,22 @@ export default function AppLayout() {
           </div>
         ))}
       </nav>
-      <div className="border-t border-slate-100 p-4 dark:border-[#203e6f]">
-        <div className="mb-4 rounded-lg border border-slate-200 bg-slate-50 p-3 dark:border-[#24456f] dark:bg-[#0c1f3d]">
+      <div className="border-t border-slate-100 p-4 dark:border-slate-700">
+        <div className="mb-4 rounded-lg border border-slate-200 bg-slate-50 p-3 dark:border-slate-700 dark:bg-slate-900">
           <div className="mb-3 flex items-center gap-3">
           <UserAvatar name={user?.name} photo={user?.profilePhoto} />
             <div className="min-w-0">
-              <p className="truncate text-sm font-black text-slate-900 dark:text-blue-50">{user?.name}</p>
-              <p className="truncate text-xs font-semibold text-slate-500 dark:text-blue-200">
-                {user?.department || "HYA Tech"}
+              <p className="truncate text-sm font-black text-slate-900 dark:text-slate-100">{user?.name}</p>
+              <p className="truncate text-xs font-semibold text-slate-500 dark:text-slate-300">
+                {user?.department || "Razk Automation"}
               </p>
             </div>
           </div>
           <div className="flex items-center justify-between gap-2 text-xs">
-            <span className="rounded-full bg-white px-2.5 py-1 font-black text-slate-600 ring-1 ring-slate-200 dark:bg-[#09192e] dark:text-blue-100 dark:ring-[#24456f]">
+            <span className="rounded-full bg-white px-2.5 py-1 font-black text-slate-600 ring-1 ring-slate-200 dark:bg-slate-800 dark:text-slate-100 dark:ring-slate-700">
               {roleLabel}
             </span>
-            <span className="inline-flex items-center gap-1 font-bold text-emerald-700 dark:text-emerald-200">
+            <span className="inline-flex items-center gap-1 font-bold text-slate-900 dark:text-slate-100">
               <Activity className="h-3.5 w-3.5" aria-hidden="true" />
               Active
             </span>
@@ -237,14 +240,14 @@ export default function AppLayout() {
 
   return (
     <div
-      className={`theme-${theme} min-h-mobile bg-[#f6f8fb] text-slate-900 dark:bg-hya-950 dark:text-blue-50`}
+      className={`theme-${theme} min-h-mobile bg-slate-50 text-slate-900 dark:bg-slate-950 dark:text-slate-100`}
       data-theme={theme}
     >
       <div className="hidden md:fixed md:inset-y-0 md:flex">{sidebar}</div>
       {open ? (
         <div className="fixed inset-0 z-40 md:hidden">
           <button
-            className="absolute inset-0 bg-slate-900/40 dark:bg-blue-950/70"
+            className="absolute inset-0 bg-slate-900/40 dark:bg-slate-900/70"
             onClick={() => setOpen(false)}
             aria-label="Close menu"
           />
@@ -252,22 +255,22 @@ export default function AppLayout() {
         </div>
       ) : null}
       <div className="md:pl-72">
-        <header className="mobile-safe-top sticky top-0 z-20 flex min-h-[72px] items-center justify-between border-b border-slate-200 bg-white/90 px-4 py-3 backdrop-blur-xl md:px-8 dark:border-[#203e6f] dark:bg-[#09192e]/95">
+        <header className="mobile-safe-top sticky top-0 z-20 flex min-h-[72px] items-center justify-between border-b border-slate-200 bg-white/90 px-4 py-3 backdrop-blur-xl md:px-8 dark:border-slate-700 dark:bg-slate-950/95">
           <div className="flex min-w-0 items-center gap-3">
             <button
-              className="inline-grid h-10 w-10 place-items-center rounded-lg border border-slate-200 bg-white text-slate-700 shadow-sm shadow-slate-900/5 md:hidden dark:border-[#24456f] dark:bg-[#0c1f3d] dark:text-blue-100"
+              className="inline-grid h-10 w-10 place-items-center rounded-lg border border-slate-200 bg-white text-slate-700 shadow-sm shadow-slate-900/5 md:hidden dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100"
               onClick={() => setOpen((current) => !current)}
               aria-label="Open menu"
             >
               {open ? <X className="h-5 w-5" /> : <Menu className="h-5 w-5" />}
             </button>
             <div className="min-w-0">
-              <div className="hidden items-center gap-1 text-xs font-bold uppercase tracking-wide text-slate-400 sm:flex dark:text-blue-300">
-                <span>HYA Tech</span>
+              <div className="hidden items-center gap-1 text-xs font-bold uppercase tracking-wide text-slate-400 sm:flex dark:text-slate-300">
+                <span>Razk Automation</span>
                 <ChevronRight className="h-3.5 w-3.5" aria-hidden="true" />
                 <span>{roleLabel}</span>
               </div>
-              <p className="truncate text-base font-black text-slate-950 dark:text-blue-50">{currentLabel}</p>
+              <p className="truncate text-base font-black text-slate-950 dark:text-slate-100">{currentLabel}</p>
             </div>
           </div>
           <div className="flex items-center gap-3">
@@ -275,10 +278,10 @@ export default function AppLayout() {
             <TopBarClock />
             <NotificationBell />
             <div className="hidden text-right sm:block">
-              <p className="text-sm font-bold text-slate-900 dark:text-blue-50">{user?.name}</p>
-              <p className="text-xs text-slate-500 dark:text-blue-200">{user?.department || "HYA Tech"}</p>
+              <p className="text-sm font-bold text-slate-900 dark:text-slate-100">{user?.name}</p>
+              <p className="text-xs text-slate-500 dark:text-slate-300">{user?.department || "Razk Automation"}</p>
             </div>
-            <UserAvatar className="shadow-sm shadow-hya-600/20" name={user?.name} photo={user?.profilePhoto} />
+            <UserAvatar className="shadow-sm shadow-slate-300/70" name={user?.name} photo={user?.profilePhoto} />
           </div>
         </header>
         <main className="mobile-safe-page mx-auto w-full max-w-[1500px] px-4 py-6 md:px-8 md:py-8">

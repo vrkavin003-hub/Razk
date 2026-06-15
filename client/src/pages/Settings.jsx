@@ -9,7 +9,7 @@ import api, { API_BASE_URL } from "../services/api";
 import { roleMatches } from "../utils/formatters";
 
 const defaultOffice = {
-  officeName: "HYA Tech",
+  officeName: "Razk Automation",
   latitude: "12.740912",
   longitude: "77.825292",
   radiusMeters: "100",
@@ -32,7 +32,7 @@ export default function Settings() {
         if (!office) return;
         setOfficeId(office._id);
         setOfficeForm({
-          officeName: office.officeName || "HYA Tech",
+          officeName: office.officeName || "Razk Automation",
           latitude: String(office.latitude ?? ""),
           longitude: String(office.longitude ?? ""),
           radiusMeters: String(office.radiusMeters ?? ""),
@@ -71,7 +71,7 @@ export default function Settings() {
       <PageHeader title="Settings" description="Application environment and account context." />
       <section className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
         <StatCard label="Role" value={user?.role?.toUpperCase()} icon={Shield} tone="blue" />
-        <StatCard label="Department" value={user?.department || "HYA Tech"} icon={Database} tone="slate" />
+        <StatCard label="Department" value={user?.department || "Razk Automation"} icon={Database} tone="slate" />
         <StatCard label="Auth" value="JWT" icon={KeyRound} tone="green" />
         <StatCard label="API" value="Online" icon={Server} tone="amber" />
       </section>
@@ -84,19 +84,19 @@ export default function Settings() {
           </div>
           <div className="rounded-lg bg-slate-50 p-4">
             <dt className="text-xs font-bold uppercase text-slate-500">Default Admin</dt>
-            <dd className="mt-2 text-sm font-semibold text-slate-900">admin@hyatech.com</dd>
+            <dd className="mt-2 text-sm font-semibold text-slate-900">admin@razkautomation.com</dd>
           </div>
         </dl>
       </section>
       {canManageOffice ? (
         <form className="mt-6 panel p-5" onSubmit={saveOffice}>
-          <div className="mb-5 flex items-start gap-3 border-b border-slate-100 pb-5 dark:border-[#203e6f]">
-            <span className="rounded-lg bg-hya-50 p-3 text-hya-700 ring-1 ring-hya-100">
+          <div className="mb-5 flex items-start gap-3 border-b border-slate-100 pb-5 dark:border-slate-700">
+            <span className="rounded-lg bg-slate-50 p-3 text-slate-900 ring-1 ring-slate-200">
               <MapPin className="h-5 w-5" aria-hidden="true" />
             </span>
             <div>
-              <h2 className="text-base font-black text-slate-950 dark:text-blue-50">Office Location Settings</h2>
-              <p className="mt-1 text-sm text-slate-500 dark:text-blue-200">
+              <h2 className="text-base font-black text-slate-950 dark:text-slate-100">Office Location Settings</h2>
+              <p className="mt-1 text-sm text-slate-500 dark:text-slate-300">
                 Office coordinates are kept for reference. Attendance can be marked from any location.
               </p>
             </div>

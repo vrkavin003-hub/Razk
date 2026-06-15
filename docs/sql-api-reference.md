@@ -1,4 +1,4 @@
-# HYA Tech SQL API Reference
+# Razk Automation SQL API Reference
 
 Base URL:
 
@@ -30,8 +30,8 @@ Login response:
   "refreshToken": "opaque-refresh-token",
   "user": {
     "id": 1,
-    "username": "hyatech-admin",
-    "email": "admin@hyatech.com",
+    "username": "razk-admin",
+    "email": "admin@razkautomation.com",
     "role": "super_admin",
     "status": "active"
   }
@@ -66,7 +66,7 @@ Payload:
 
 ```json
 {
-  "officeName": "HYA Tech",
+  "officeName": "Razk Automation",
   "latitude": 12.740912,
   "longitude": 77.825292,
   "radiusMeters": 100,
@@ -89,7 +89,7 @@ Check-in/check-out payload:
 
 ```json
 {
-  "employee_id": "HYA-DEMO-EMP",
+  "employee_id": "RAZK-DEMO-EMP",
   "latitude": 12.740912,
   "longitude": 77.825292
 }

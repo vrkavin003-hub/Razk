@@ -12,6 +12,7 @@ import UserAvatar from "../components/UserAvatar";
 import { useAuth } from "../context/AuthContext";
 import api from "../services/api";
 import { formatDate } from "../utils/formatters";
+import { canDecideRequest } from "../utils/requestAccess";
 
 const defaultForm = {
   permissionType: "Late Coming",
@@ -89,16 +90,16 @@ export default function PermissionRequests() {
         <>
         <section className="mb-6 grid gap-4 md:grid-cols-3">
           <div className="surface-muted p-4">
-            <p className="text-xs font-black uppercase text-slate-500 dark:text-blue-200">Paid Permission Limit</p>
-            <p className="mt-2 text-2xl font-black text-slate-950 dark:text-blue-50">{balance?.limit ?? 2} hours</p>
+            <p className="text-xs font-black uppercase text-slate-500 dark:text-slate-300">Paid Permission Limit</p>
+            <p className="mt-2 text-2xl font-black text-slate-950 dark:text-slate-100">{balance?.limit ?? 2} hours</p>
           </div>
           <div className="surface-muted p-4">
-            <p className="text-xs font-black uppercase text-slate-500 dark:text-blue-200">Used This Month</p>
-            <p className="mt-2 text-2xl font-black text-amber-600 dark:text-amber-200">{balance?.used ?? 0}</p>
+            <p className="text-xs font-black uppercase text-slate-500 dark:text-slate-300">Used This Month</p>
+            <p className="mt-2 text-2xl font-black text-slate-950 dark:text-slate-100">{balance?.used ?? 0}</p>
           </div>
           <div className="surface-muted p-4">
-            <p className="text-xs font-black uppercase text-slate-500 dark:text-blue-200">Remaining</p>
-            <p className="mt-2 text-2xl font-black text-emerald-600 dark:text-emerald-200">{balance?.remaining ?? 2}</p>
+            <p className="text-xs font-black uppercase text-slate-500 dark:text-slate-300">Remaining</p>
+            <p className="mt-2 text-2xl font-black text-slate-950 dark:text-slate-100">{balance?.remaining ?? 2}</p>
           </div>
         </section>
         <form className="mb-6 panel p-5" onSubmit={submit}>
@@ -157,7 +158,9 @@ export default function PermissionRequests() {
               </tr>
             </thead>
             <tbody>
-              {permissions.map((permission) => (
+              {permissions.map((permission) => {
+                const canDecide = canDecideRequest(permission, user);
+                return (
                 <tr key={permission._id}>
                   <td className="table-cell">
                     <div className="flex items-center gap-3">
@@ -167,7 +170,7 @@ export default function PermissionRequests() {
                         <p className="text-xs text-slate-500">{permission.employee?.employeeId || user?.employeeId || ""}</p>
                         <p className="text-xs text-slate-500">{permission.employee?.department || user?.department || ""}</p>
                         {isManager && balances[String(permission.employee?._id || "")] ? (
-                          <p className="text-xs font-bold text-emerald-700">
+                          <p className="text-xs font-bold text-slate-900">
                             Balance: {balances[String(permission.employee?._id || "")].remaining} hrs
                           </p>
                         ) : null}
@@ -181,7 +184,7 @@ export default function PermissionRequests() {
                     <p className="font-semibold">{permission.paidHours ?? permission.requestedHours ?? "-"} paid</p>
                     <p className="text-xs text-slate-500">{permission.unpaidHours || 0} unpaid</p>
                     {permission.limitExceeded ? (
-                      <p className="text-xs font-bold text-amber-700">Limit exceeded</p>
+                      <p className="text-xs font-bold text-slate-900">Limit exceeded</p>
                     ) : null}
                   </td>
                   <td className="table-cell">
@@ -208,7 +211,7 @@ export default function PermissionRequests() {
                     <td className="table-cell">
                       <div className="flex gap-2">
                         <Button
-                          disabled={permission.status !== "Pending"}
+                          disabled={!canDecide}
                           icon={CheckCircle2}
                           onClick={() => setDecision({ action: "approve", permission })}
                           size="sm"
@@ -217,7 +220,7 @@ export default function PermissionRequests() {
                           Approve
                         </Button>
                         <Button
-                          disabled={permission.status !== "Pending"}
+                          disabled={!canDecide}
                           icon={XCircle}
                           onClick={() => setDecision({ action: "reject", permission })}
                           size="sm"
@@ -229,7 +232,8 @@ export default function PermissionRequests() {
                     </td>
                   ) : null}
                 </tr>
-              ))}
+              );
+              })}
             </tbody>
           </table>
         </div>

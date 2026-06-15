@@ -7,8 +7,8 @@ dotenv.config();
 const seed = async () => {
   await connectSql();
 
-  const username = process.env.SEED_ADMIN_USERNAME || "hyatech-admin";
-  const email = (process.env.SEED_ADMIN_EMAIL || "admin@hyatech.com").toLowerCase();
+  const username = process.env.SEED_ADMIN_USERNAME || "razk-admin";
+  const email = (process.env.SEED_ADMIN_EMAIL || "admin@razkautomation.com").toLowerCase();
   const password = process.env.SEED_ADMIN_PASSWORD || "Admin@12345";
   const passwordHash = await bcrypt.hash(password, 12);
 
@@ -28,9 +28,9 @@ const seed = async () => {
   if (!offices.length) {
     await query(
       `INSERT INTO office_locations (office_name, latitude, longitude, radius_meters, status)
-       VALUES ('HYA Tech', 12.740912, 77.825292, 100, 'active')`
+       VALUES ('Razk Automation', 12.740912, 77.825292, 100, 'active')`
     );
-    console.log("Default SQL office location created: HYA Tech");
+    console.log("Default SQL office location created: Razk Automation");
   }
 
   process.exit(0);

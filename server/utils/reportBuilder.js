@@ -4,7 +4,7 @@ const PDFDocument = require("pdfkit");
 const { toDateKey } = require("./dates");
 const { getShiftFromCheckIn } = require("./shifts");
 
-const logoPath = path.join(__dirname, "..", "assets", "hya-logo.png");
+const logoPath = path.join(__dirname, "..", "assets", "razk-logo.jpeg");
 
 const parseDateKey = (value) => {
   const date = new Date(value);
@@ -300,7 +300,7 @@ const drawHeader = (doc, report) => {
     .fontSize(16)
     .fillColor("#0f172a")
     .font("Helvetica-Bold")
-    .text("HYA Tech Employee Management System", 112, 36);
+    .text("Razk Automation Employee Management System", 112, 36);
   doc.fontSize(12).fillColor("#1d4ed8").text(report.title, 112, 58);
   doc
     .fontSize(8)

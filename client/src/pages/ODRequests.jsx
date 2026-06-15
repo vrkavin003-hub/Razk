@@ -14,6 +14,7 @@ import { mediaUrl } from "../config/api";
 import { useAuth } from "../context/AuthContext";
 import api from "../services/api";
 import { formatDate } from "../utils/formatters";
+import { canDecideRequest } from "../utils/requestAccess";
 
 const defaultForm = {
   attachment: "",
@@ -134,7 +135,7 @@ export default function ODRequests() {
                   onUploaded={(url) => setForm((current) => ({ ...current, attachment: url }))}
                 />
                 {form.attachment ? (
-                  <a className="inline-flex items-center gap-1 text-sm font-bold text-hya-700" href={mediaUrl(form.attachment)} target="_blank" rel="noreferrer">
+                  <a className="inline-flex items-center gap-1 text-sm font-bold text-slate-900" href={mediaUrl(form.attachment)} target="_blank" rel="noreferrer">
                     View file <ExternalLink className="h-3.5 w-3.5" aria-hidden="true" />
                   </a>
                 ) : null}
@@ -172,7 +173,9 @@ export default function ODRequests() {
               </tr>
             </thead>
             <tbody>
-              {requests.map((request) => (
+              {requests.map((request) => {
+                const canDecide = canDecideRequest(request, user);
+                return (
                 <tr key={request._id}>
                   <td className="table-cell">
                     <div className="flex items-center gap-3">
@@ -190,7 +193,7 @@ export default function ODRequests() {
                   <td className="table-cell max-w-xs">{request.reason}</td>
                   <td className="table-cell">
                     {request.attachment ? (
-                      <a className="inline-flex items-center gap-1 text-xs font-bold text-hya-700" href={mediaUrl(request.attachment)} target="_blank" rel="noreferrer">
+                      <a className="inline-flex items-center gap-1 text-xs font-bold text-slate-900" href={mediaUrl(request.attachment)} target="_blank" rel="noreferrer">
                         View file <ExternalLink className="h-3 w-3" aria-hidden="true" />
                       </a>
                     ) : (
@@ -217,7 +220,7 @@ export default function ODRequests() {
                     <td className="table-cell">
                       <div className="flex gap-2">
                         <Button
-                          disabled={request.status !== "Pending"}
+                          disabled={!canDecide}
                           icon={CheckCircle2}
                           onClick={() => setDecision({ action: "approve", request })}
                           size="sm"
@@ -226,7 +229,7 @@ export default function ODRequests() {
                           Approve
                         </Button>
                         <Button
-                          disabled={request.status !== "Pending"}
+                          disabled={!canDecide}
                           icon={XCircle}
                           onClick={() => setDecision({ action: "reject", request })}
                           size="sm"
@@ -238,7 +241,8 @@ export default function ODRequests() {
                     </td>
                   ) : null}
                 </tr>
-              ))}
+              );
+              })}
             </tbody>
           </table>
         </div>

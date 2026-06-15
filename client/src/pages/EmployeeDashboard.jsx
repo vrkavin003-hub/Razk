@@ -155,7 +155,7 @@ export default function EmployeeDashboard({ title = "Employee Dashboard" }) {
             <div className="surface-muted p-4">
               <p className="text-xs font-black uppercase text-slate-500">Map</p>
               {locationState.coordinates ? (
-                <a className="mt-2 inline-flex items-center gap-1 text-sm font-black text-hya-700" href={googleMapsUrl(locationState.coordinates.latitude, locationState.coordinates.longitude)} target="_blank" rel="noreferrer">
+                <a className="mt-2 inline-flex items-center gap-1 text-sm font-black text-slate-900" href={googleMapsUrl(locationState.coordinates.latitude, locationState.coordinates.longitude)} target="_blank" rel="noreferrer">
                   View Map
                   <ExternalLink className="h-3.5 w-3.5" aria-hidden="true" />
                 </a>
@@ -166,7 +166,7 @@ export default function EmployeeDashboard({ title = "Employee Dashboard" }) {
             </div>
           </div>
           {locationState.error ? (
-            <div className="mt-4 rounded-lg border border-amber-200 bg-amber-50 p-3 text-sm font-semibold text-amber-800">
+            <div className="mt-4 rounded-lg border border-slate-200 bg-slate-50 p-3 text-sm font-semibold text-slate-900">
               {locationState.error}
             </div>
           ) : null}
@@ -196,7 +196,7 @@ export default function EmployeeDashboard({ title = "Employee Dashboard" }) {
                       <p className="font-semibold">{item.checkInLocationStatus || "Location not available"}</p>
                       <p className="text-xs text-slate-500">{item.checkInLatitude ?? "-"}, {item.checkInLongitude ?? "-"}</p>
                       {googleMapsUrl(item.checkInLatitude, item.checkInLongitude) ? (
-                        <a className="mt-1 inline-flex items-center gap-1 text-xs font-bold text-hya-700" href={googleMapsUrl(item.checkInLatitude, item.checkInLongitude)} target="_blank" rel="noreferrer">
+                        <a className="mt-1 inline-flex items-center gap-1 text-xs font-bold text-slate-900" href={googleMapsUrl(item.checkInLatitude, item.checkInLongitude)} target="_blank" rel="noreferrer">
                           View Map <ExternalLink className="h-3 w-3" aria-hidden="true" />
                         </a>
                       ) : null}
@@ -205,7 +205,7 @@ export default function EmployeeDashboard({ title = "Employee Dashboard" }) {
                       <p className="font-semibold">{item.checkOutLocationStatus || "Location not available"}</p>
                       <p className="text-xs text-slate-500">{item.checkOutLatitude ?? "-"}, {item.checkOutLongitude ?? "-"}</p>
                       {googleMapsUrl(item.checkOutLatitude, item.checkOutLongitude) ? (
-                        <a className="mt-1 inline-flex items-center gap-1 text-xs font-bold text-hya-700" href={googleMapsUrl(item.checkOutLatitude, item.checkOutLongitude)} target="_blank" rel="noreferrer">
+                        <a className="mt-1 inline-flex items-center gap-1 text-xs font-bold text-slate-900" href={googleMapsUrl(item.checkOutLatitude, item.checkOutLongitude)} target="_blank" rel="noreferrer">
                           View Map <ExternalLink className="h-3 w-3" aria-hidden="true" />
                         </a>
                       ) : null}

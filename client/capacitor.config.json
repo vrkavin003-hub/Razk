@@ -1,6 +1,6 @@
 {
-  "appId": "com.hyatech.attendance",
-  "appName": "HYA Attendance",
+  "appId": "com.razkautomation.attendance",
+  "appName": "Razk Automation",
   "webDir": "dist",
   "bundledWebRuntime": false,
   "server": {

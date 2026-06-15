@@ -5,7 +5,7 @@ const AuthContext = createContext(null);
 
 const storedUser = () => {
   try {
-    return JSON.parse(localStorage.getItem("hya_user")) || null;
+    return JSON.parse(localStorage.getItem("razk_user")) || null;
   } catch {
     return null;
   }
@@ -13,12 +13,12 @@ const storedUser = () => {
 
 export const AuthProvider = ({ children }) => {
   const [user, setUser] = useState(storedUser);
-  const [token, setToken] = useState(localStorage.getItem("hya_token"));
+  const [token, setToken] = useState(localStorage.getItem("razk_token"));
   const [authReady, setAuthReady] = useState(false);
 
   const clearSession = useCallback(() => {
-    localStorage.removeItem("hya_token");
-    localStorage.removeItem("hya_user");
+    localStorage.removeItem("razk_token");
+    localStorage.removeItem("razk_user");
     setToken(null);
     setUser(null);
   }, []);
@@ -29,18 +29,18 @@ export const AuthProvider = ({ children }) => {
       password: credentials.password
     };
     const { data } = await api.post("/auth/login", payload);
-    localStorage.setItem("hya_token", data.token);
-    localStorage.setItem("hya_user", JSON.stringify(data.user));
+    localStorage.setItem("razk_token", data.token);
+    localStorage.setItem("razk_user", JSON.stringify(data.user));
     setToken(data.token);
     setUser(data.user);
     return data.user;
   };
 
   const refreshMe = async () => {
-    if (!localStorage.getItem("hya_token")) return null;
+    if (!localStorage.getItem("razk_token")) return null;
     try {
       const { data } = await api.get("/auth/me");
-      localStorage.setItem("hya_user", JSON.stringify(data.user));
+      localStorage.setItem("razk_user", JSON.stringify(data.user));
       setUser(data.user);
       return data.user;
     } catch (error) {
@@ -55,15 +55,15 @@ export const AuthProvider = ({ children }) => {
 
   useEffect(() => {
     const handleAuthExpired = () => clearSession();
-    window.addEventListener("hya:auth-expired", handleAuthExpired);
-    return () => window.removeEventListener("hya:auth-expired", handleAuthExpired);
+    window.addEventListener("razk:auth-expired", handleAuthExpired);
+    return () => window.removeEventListener("razk:auth-expired", handleAuthExpired);
   }, [clearSession]);
 
   useEffect(() => {
     let active = true;
 
     const bootstrap = async () => {
-      if (!localStorage.getItem("hya_token")) {
+      if (!localStorage.getItem("razk_token")) {
         if (active) setAuthReady(true);
         return;
       }

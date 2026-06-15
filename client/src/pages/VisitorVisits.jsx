@@ -125,12 +125,12 @@ export default function VisitorVisits() {
         }
       />
       <form className="mb-6 panel p-5" onSubmit={submit}>
-        <div className="mb-4 flex items-center justify-between gap-3 border-b border-slate-100 pb-4 dark:border-[#203e6f]">
+        <div className="mb-4 flex items-center justify-between gap-3 border-b border-slate-100 pb-4 dark:border-slate-700">
           <div>
-            <h2 className="text-base font-black text-slate-950 dark:text-blue-50">
+            <h2 className="text-base font-black text-slate-950 dark:text-slate-100">
               {editingId ? "Edit Visitor" : "Add Visitor"}
             </h2>
-            <p className="mt-1 text-sm text-slate-500 dark:text-blue-200">Capture visitor details and optional photo.</p>
+            <p className="mt-1 text-sm text-slate-500 dark:text-slate-300">Capture visitor details and optional photo.</p>
           </div>
           {editingId ? (
             <Button icon={X} onClick={resetForm} type="button" variant="secondary">

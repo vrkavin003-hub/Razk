@@ -1,14 +1,16 @@
 const variants = {
   primary:
-    "bg-hya-600 text-white shadow-sm shadow-hya-600/20 hover:bg-hya-700 focus:ring-hya-100 dark:shadow-none",
+    "bg-slate-950 text-white shadow-sm shadow-slate-900/20 hover:bg-slate-800 focus:ring-slate-200 dark:bg-slate-100 dark:text-slate-950 dark:shadow-none",
   secondary:
-    "border border-slate-200 bg-white text-slate-700 shadow-sm shadow-slate-900/5 hover:border-slate-300 hover:bg-slate-50 focus:ring-slate-100 dark:border-[#24456f] dark:bg-[#0c1f3d] dark:text-blue-100 dark:shadow-none dark:hover:bg-[#123052] dark:focus:ring-blue-950",
-  danger: "bg-rose-600 text-white shadow-sm shadow-rose-600/20 hover:bg-rose-700 focus:ring-rose-100 dark:shadow-none",
+    "border border-slate-200 bg-white text-slate-700 shadow-sm shadow-slate-900/5 hover:border-slate-300 hover:bg-slate-50 focus:ring-slate-100 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100 dark:shadow-none dark:hover:bg-slate-800 dark:focus:ring-slate-600",
+  danger:
+    "bg-slate-900 text-white shadow-sm shadow-slate-900/20 hover:bg-slate-700 focus:ring-slate-200 dark:shadow-none",
   success:
-    "bg-emerald-600 text-white shadow-sm shadow-emerald-600/20 hover:bg-emerald-700 focus:ring-emerald-100 dark:shadow-none",
-  warning: "bg-amber-500 text-white shadow-sm shadow-amber-500/20 hover:bg-amber-600 focus:ring-amber-100 dark:shadow-none",
+    "bg-slate-900 text-white shadow-sm shadow-slate-900/20 hover:bg-slate-700 focus:ring-slate-200 dark:shadow-none",
+  warning:
+    "bg-slate-900 text-white shadow-sm shadow-slate-900/20 hover:bg-slate-700 focus:ring-slate-200 dark:shadow-none",
   ghost:
-    "text-slate-600 hover:bg-slate-100 hover:text-slate-950 focus:ring-slate-100 dark:text-blue-100 dark:hover:bg-[#123052] dark:hover:text-white dark:focus:ring-blue-950"
+    "text-slate-600 hover:bg-slate-100 hover:text-slate-950 focus:ring-slate-100 dark:text-slate-100 dark:hover:bg-slate-800 dark:hover:text-white dark:focus:ring-slate-600"
 };
 
 const sizes = {

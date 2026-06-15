@@ -1,11 +1,12 @@
 {
-  "name": "hya-tech-hrms-server",
+  "name": "razk-automation-hrms-server",
   "version": "1.0.0",
-  "description": "Backend API for HYA Tech Employee Management System",
+  "description": "Backend API for Razk Automation Employee Management System",
   "main": "server.js",
   "scripts": {
     "dev": "nodemon server.js",
     "start": "node server.js",
+    "db:sqlserver:schema": "node scripts/runSqlServerSchema.js",
     "seed": "node scripts/seedAdmin.js",
     "seed:sql": "node sql/seedAdminSql.js"
   },
@@ -20,6 +21,7 @@
     "jsonwebtoken": "^9.0.2",
     "mongoose": "^8.9.5",
     "morgan": "^1.10.0",
+    "mssql": "^12.5.5",
     "multer": "^2.1.1",
     "mysql2": "^3.22.5",
     "pdfkit": "^0.18.0"

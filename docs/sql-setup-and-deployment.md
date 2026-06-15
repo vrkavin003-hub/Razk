@@ -1,4 +1,4 @@
-# HYA Tech SQL Setup And Deployment Guide
+# Razk Automation SQL Setup And Deployment Guide
 
 ## Local MySQL Setup
 
@@ -19,9 +19,9 @@ JWT_EXPIRES_IN=15m
 REFRESH_TOKEN_DAYS=30
 MYSQL_HOST=127.0.0.1
 MYSQL_PORT=3306
-MYSQL_USER=hyatech_user
+MYSQL_USER=razk_user
 MYSQL_PASSWORD=replace-with-strong-password
-MYSQL_DATABASE=hyatech_db
+MYSQL_DATABASE=razkautomation_db
 RATE_LIMIT_WINDOW_MS=900000
 RATE_LIMIT_MAX=300
 MAX_RESUME_BYTES=5242880
@@ -66,9 +66,9 @@ CLIENT_ORIGIN=https://your-frontend-domain.com
 JWT_SECRET=long-random-production-secret
 MYSQL_HOST=your-mysql-host
 MYSQL_PORT=3306
-MYSQL_USER=hyatech_user
+MYSQL_USER=razk_user
 MYSQL_PASSWORD=strong-password
-MYSQL_DATABASE=hyatech_db
+MYSQL_DATABASE=razkautomation_db
 RATE_LIMIT_MAX=300
 ALLOW_LOCAL_STORE=false
 ```

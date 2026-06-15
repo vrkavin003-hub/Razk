@@ -1,7 +1,7 @@
 <?xml version='1.0' encoding='utf-8'?>
 <resources>
-    <string name="app_name">HYA Tech</string>
-    <string name="title_activity_main">HYA Tech</string>
-    <string name="package_name">com.hyatech.attendance</string>
-    <string name="custom_url_scheme">com.hyatech.attendance</string>
+    <string name="app_name">Razk Automation</string>
+    <string name="title_activity_main">Razk Automation</string>
+    <string name="package_name">com.razkautomation.attendance</string>
+    <string name="custom_url_scheme">com.razkautomation.attendance</string>
 </resources>
