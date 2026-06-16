@@ -30,7 +30,9 @@ const isAllowedVercelPreviewOrigin = (origin) => {
     const { hostname, protocol } = new URL(origin);
     return (
       protocol === "https:" &&
-      (hostname === "razk.vercel.app" || /^razk-[a-z0-9-]+-kavin-v-projects\.vercel\.app$/.test(hostname))
+      (hostname === "razk.vercel.app" ||
+        hostname === "razk-eta.vercel.app" ||
+        /^razk-[a-z0-9-]+-kavin-v-projects\.vercel\.app$/.test(hostname))
     );
   } catch {
     return false;
