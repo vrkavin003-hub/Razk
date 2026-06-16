@@ -28,8 +28,13 @@ import Loading from "./Loading";
 import PageHeader from "./PageHeader";
 import StatCard from "./StatCard";
 
-const leaveColors = ["#64748b", "#475569", "#0f172a"];
-const chartGrid = "#cbd5e1";
+const leaveColors = {
+  Pending: "#f59e0b",
+  Approved: "#10b981",
+  Rejected: "#e11d48"
+};
+const fallbackLeaveColors = ["#f59e0b", "#10b981", "#e11d48"];
+const chartGrid = "#dbeafe";
 const tooltipStyle = {
   border: "1px solid #cbd5e1",
   borderRadius: 8,
@@ -96,7 +101,7 @@ export default function OrgDashboard({ endpoint, title }) {
           <p className="text-sm font-black text-slate-950 dark:text-slate-100">Today Coverage</p>
           <div className="mt-4 h-3 overflow-hidden rounded-full bg-slate-100 dark:bg-slate-800">
             <div
-              className="h-full rounded-full bg-slate-700"
+              className="h-full rounded-full bg-[#2563eb]"
               style={{
                 width: `${Math.min(
                   100,
@@ -132,9 +137,9 @@ export default function OrgDashboard({ endpoint, title }) {
                 <YAxis allowDecimals={false} tick={{ fontSize: 12 }} />
                 <Tooltip contentStyle={tooltipStyle} cursor={{ fill: "rgba(37, 99, 235, 0.08)" }} />
                 <Legend />
-                <Bar dataKey="present" fill="#64748b" radius={[6, 6, 0, 0]} />
-                <Bar dataKey="late" fill="#94a3b8" radius={[6, 6, 0, 0]} />
-                <Bar dataKey="absent" fill="#0f172a" radius={[6, 6, 0, 0]} />
+                <Bar dataKey="present" fill="#2563eb" radius={[6, 6, 0, 0]} />
+                <Bar dataKey="late" fill="#f59e0b" radius={[6, 6, 0, 0]} />
+                <Bar dataKey="absent" fill="#e11d48" radius={[6, 6, 0, 0]} />
               </BarChart>
             </ResponsiveContainer>
           </div>
@@ -156,7 +161,7 @@ export default function OrgDashboard({ endpoint, title }) {
                   paddingAngle={3}
                 >
                   {(dashboard.leaveStatusChart || []).map((entry, index) => (
-                    <Cell key={entry.status} fill={leaveColors[index % leaveColors.length]} />
+                    <Cell key={entry.status} fill={leaveColors[entry.status] || fallbackLeaveColors[index % fallbackLeaveColors.length]} />
                   ))}
                 </Pie>
                 <Tooltip contentStyle={tooltipStyle} />

@@ -72,13 +72,13 @@ export default function NotificationBell() {
     <div className="relative" ref={wrapperRef}>
       <button
         aria-label="Notifications"
-        className="relative inline-grid h-10 w-10 place-items-center rounded-lg border border-slate-200 bg-white text-slate-700 shadow-sm shadow-slate-900/5 transition hover:border-hya-100 hover:bg-hya-50 hover:text-hya-700 focus:outline-none focus:ring-4 focus:ring-hya-100 dark:border-[#203e6f] dark:bg-[#0c1f3d] dark:text-blue-100 dark:shadow-none dark:hover:bg-[#123052] dark:focus:ring-[#24456f]"
+        className="relative inline-grid h-10 w-10 place-items-center rounded-lg border border-slate-200 bg-white text-[#2563eb] shadow-sm shadow-slate-900/5 transition hover:border-blue-200 hover:bg-blue-50 hover:text-[#1d4ed8] focus:outline-none focus:ring-4 focus:ring-blue-100 dark:border-[#203e6f] dark:bg-[#0c1f3d] dark:text-blue-100 dark:shadow-none dark:hover:bg-[#123052] dark:focus:ring-[#24456f]"
         onClick={() => setOpen((current) => !current)}
         type="button"
       >
         <Bell className="h-5 w-5" aria-hidden="true" />
         {unreadCount ? (
-          <span className="absolute -right-1 -top-1 grid min-h-5 min-w-5 place-items-center rounded-full bg-hya-600 px-1 text-xs font-black text-white">
+          <span className="absolute -right-1 -top-1 grid min-h-5 min-w-5 place-items-center rounded-full bg-[#f59e0b] px-1 text-xs font-black text-white">
             {unreadCount > 9 ? "9+" : unreadCount}
           </span>
         ) : null}
@@ -91,7 +91,7 @@ export default function NotificationBell() {
               <p className="text-xs text-slate-500 dark:text-slate-300">{unreadCount} unread</p>
             </div>
             <button
-              className="inline-flex items-center gap-1 rounded-md px-2 py-1 text-xs font-bold text-hya-700 hover:bg-hya-50 disabled:opacity-50 dark:text-blue-100 dark:hover:bg-[#123052]"
+              className="inline-flex items-center gap-1 rounded-md px-2 py-1 text-xs font-bold text-[#2563eb] hover:bg-blue-50 disabled:opacity-50 dark:text-blue-100 dark:hover:bg-[#123052]"
               disabled={loading || unreadCount === 0}
               onClick={markAllRead}
               type="button"
@@ -104,7 +104,7 @@ export default function NotificationBell() {
               notifications.map((notification) => (
                 <div
                   className={`flex items-start border-b border-slate-100 transition hover:bg-hya-50 dark:border-[#203e6f] dark:hover:bg-[#102a47] ${
-                    notification.isRead ? "bg-white dark:bg-[#0c1f3d]" : "bg-hya-50/80 dark:bg-[#123052]"
+                    notification.isRead ? "bg-white dark:bg-[#0c1f3d]" : "bg-blue-50/80 dark:bg-[#123052]"
                   }`}
                   key={notification._id}
                 >
@@ -115,7 +115,7 @@ export default function NotificationBell() {
                   >
                     <span
                       className={`mt-1 h-2.5 w-2.5 shrink-0 rounded-full ${
-                        notification.isRead ? "bg-slate-300 dark:bg-[#24456f]" : "bg-hya-600 dark:bg-blue-200"
+                        notification.isRead ? "bg-slate-300 dark:bg-[#24456f]" : "bg-[#f59e0b] dark:bg-[#f59e0b]"
                       }`}
                     />
                     <span className="min-w-0 flex-1">

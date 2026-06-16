@@ -53,6 +53,10 @@ export const saveReportFile = async ({ blob, filename, mimeType }) => {
     return;
   }
 
-  if (await shareInBrowser(blob, filename, mimeType)) return;
-  downloadInBrowser(blob, filename);
+  try {
+    downloadInBrowser(blob, filename);
+  } catch {
+    if (await shareInBrowser(blob, filename, mimeType)) return;
+    throw new Error("Unable to download report file");
+  }
 };
