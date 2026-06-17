@@ -99,11 +99,16 @@ export default function ODRequests() {
             <label className="space-y-1">
               <span className="form-label">Location / Client Place</span>
               <input
+                list="od-location-places"
                 className="form-input"
                 value={form.location}
                 onChange={(event) => setForm({ ...form, location: event.target.value })}
                 required
               />
+              <datalist id="od-location-places">
+                <option value="Chennai" />
+                <option value="Hosur" />
+              </datalist>
             </label>
             <label className="space-y-1">
               <span className="form-label">From Time</span>

@@ -1,4 +1,4 @@
-import { Edit, Plus, Search, Trash2 } from "lucide-react";
+import { Edit, Plus, RotateCcw, Search, Trash2 } from "lucide-react";
 import { useEffect, useState } from "react";
 import toast from "react-hot-toast";
 import { Link } from "react-router-dom";
@@ -7,10 +7,13 @@ import EmptyState from "../components/EmptyState";
 import Loading from "../components/Loading";
 import PageHeader from "../components/PageHeader";
 import StatusBadge from "../components/StatusBadge";
+import { useAuth } from "../context/AuthContext";
 import api from "../services/api";
-import { initials } from "../utils/formatters";
+import { formatDateTime, initials } from "../utils/formatters";
 
 export default function EmployeesList() {
+  const { user } = useAuth();
+  const canResetDevice = user?.role === "admin";
   const [employees, setEmployees] = useState(null);
   const [search, setSearch] = useState("");
 
@@ -28,6 +31,17 @@ export default function EmployeesList() {
     try {
       await api.delete(`/employees/${employee._id}`);
       toast.success("Employee deactivated");
+      await load();
+    } catch (error) {
+      toast.error(error.message);
+    }
+  };
+
+  const resetDevice = async (employee) => {
+    if (!window.confirm(`Reset registered device for ${employee.name}? They will be able to login from a new phone after reset.`)) return;
+    try {
+      await api.patch(`/employees/${employee._id}/reset-device`);
+      toast.success("Employee device reset");
       await load();
     } catch (error) {
       toast.error(error.message);
@@ -79,6 +93,7 @@ export default function EmployeesList() {
                 <th className="px-4 py-3">Department</th>
                 <th className="px-4 py-3">Designation</th>
                 <th className="px-4 py-3">Role</th>
+                <th className="px-4 py-3">Device</th>
                 <th className="px-4 py-3">Status</th>
                 <th className="px-4 py-3">Actions</th>
               </tr>
@@ -103,6 +118,23 @@ export default function EmployeesList() {
                   <td className="table-cell">{employee.designation || "-"}</td>
                   <td className="table-cell uppercase">{employee.role}</td>
                   <td className="table-cell">
+                    {employee.role === "employee" ? (
+                      <div>
+                        <p className="font-semibold text-slate-900 dark:text-slate-100">
+                          {employee.registeredDeviceId ? "Device registered" : "No device registered"}
+                        </p>
+                        {employee.registeredDeviceName ? (
+                          <p className="text-xs text-slate-500 dark:text-slate-300">{employee.registeredDeviceName}</p>
+                        ) : null}
+                        {employee.deviceRegisteredAt ? (
+                          <p className="text-xs text-slate-500 dark:text-slate-300">{formatDateTime(employee.deviceRegisteredAt)}</p>
+                        ) : null}
+                      </div>
+                    ) : (
+                      <span className="text-xs font-semibold text-slate-500 dark:text-slate-300">Multiple devices allowed</span>
+                    )}
+                  </td>
+                  <td className="table-cell">
                     <StatusBadge status={employee.isActive ? "Present" : "Rejected"} />
                   </td>
                   <td className="table-cell">
@@ -115,6 +147,11 @@ export default function EmployeesList() {
                       <Button icon={Trash2} onClick={() => remove(employee)} size="sm" variant="danger">
                         Deactivate
                       </Button>
+                      {canResetDevice && employee.role === "employee" ? (
+                        <Button icon={RotateCcw} onClick={() => resetDevice(employee)} size="sm" variant="warning">
+                          Reset Device
+                        </Button>
+                      ) : null}
                     </div>
                   </td>
                 </tr>

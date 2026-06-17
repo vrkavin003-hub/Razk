@@ -1,4 +1,4 @@
-import { CalendarCheck, Clock3, ExternalLink, LogIn, LogOut, Navigation, Send } from "lucide-react";
+import { CalendarCheck, Camera, Clock3, ExternalLink, LogIn, LogOut, Navigation, Send } from "lucide-react";
 import { useEffect, useState } from "react";
 import toast from "react-hot-toast";
 import Button from "../components/Button";
@@ -8,8 +8,12 @@ import Loading from "../components/Loading";
 import PageHeader from "../components/PageHeader";
 import StatCard from "../components/StatCard";
 import StatusBadge from "../components/StatusBadge";
+import { mediaUrl } from "../config/api";
 import { useAuth } from "../context/AuthContext";
 import api from "../services/api";
+import { uploadFile } from "../services/upload";
+import { createWatermarkedAttendancePhoto } from "../utils/attendancePhoto";
+import { getDeviceInfo } from "../utils/device";
 import { formatDate, formatTime } from "../utils/formatters";
 import { getAttendanceLocationPayload, googleMapsUrl } from "../utils/geolocation";
 import { attendanceShift } from "../utils/shifts";
@@ -33,6 +37,7 @@ export default function EmployeeDashboard({ title = "Employee Dashboard" }) {
     error: "",
     loading: false
   });
+  const [attendancePhotoFile, setAttendancePhotoFile] = useState(null);
   const [loadingAction, setLoadingAction] = useState(false);
 
   const load = async () => {
@@ -62,13 +67,21 @@ export default function EmployeeDashboard({ title = "Employee Dashboard" }) {
     setLoadingAction(true);
     try {
       const location = await refreshLocation(false);
-      await api.post(path, {
+      const payload = {
         employee_id: user?.employeeId,
         accuracy: location.accuracy,
         latitude: location.latitude,
         locationStatus: location.locationStatus,
         longitude: location.longitude
-      });
+      };
+      if (path.includes("check-in") && attendancePhotoFile) {
+        const watermarkedPhoto = await createWatermarkedAttendancePhoto(attendancePhotoFile);
+        const uploaded = await uploadFile(watermarkedPhoto, "image");
+        payload.attendancePhoto = uploaded.url;
+        payload.attendancePhotoDevice = getDeviceInfo().deviceName;
+      }
+      await api.post(path, payload);
+      if (path.includes("check-in")) setAttendancePhotoFile(null);
       toast.success(location.locationStatus === "Captured" ? successMessage : location.locationStatus === "Permission denied" ? "Attendance marked, but location permission was not allowed." : locationUnavailableMessage);
       await load();
     } catch (error) {
@@ -139,6 +152,28 @@ export default function EmployeeDashboard({ title = "Employee Dashboard" }) {
               {locationState.loading ? "Checking GPS..." : "Refresh Location"}
             </Button>
           </div>
+          <div className="mt-5 rounded-lg border border-slate-200 bg-slate-50 p-4">
+            <label className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+              <span>
+                <span className="flex items-center gap-2 text-sm font-black text-slate-950">
+                  <Camera className="h-4 w-4" aria-hidden="true" />
+                  Attendance Photo
+                </span>
+                <span className="mt-1 block text-xs font-semibold text-slate-500">
+                  Optional check-in photo with automatic time and device watermark.
+                </span>
+              </span>
+              <input
+                accept="image/*"
+                capture="environment"
+                className="form-input sm:max-w-xs"
+                disabled={loadingAction || Boolean(dashboard.attendance?.checkIn)}
+                type="file"
+                onChange={(event) => setAttendancePhotoFile(event.target.files?.[0] || null)}
+              />
+            </label>
+            {attendancePhotoFile ? <p className="mt-2 text-xs font-semibold text-slate-500">{attendancePhotoFile.name}</p> : null}
+          </div>
           <div className="mt-5 grid gap-3 md:grid-cols-3">
             <div className="surface-muted p-4">
               <p className="text-xs font-black uppercase text-slate-500">Location Status</p>
@@ -179,6 +214,7 @@ export default function EmployeeDashboard({ title = "Employee Dashboard" }) {
                   <th className="px-4 py-3">Out</th>
                   <th className="px-4 py-3">Shift</th>
                   <th className="px-4 py-3">In Location</th>
+                  <th className="px-4 py-3">Photo</th>
                   <th className="px-4 py-3">Out Location</th>
                   <th className="px-4 py-3">Hours</th>
                   <th className="px-4 py-3">Status</th>
@@ -200,6 +236,15 @@ export default function EmployeeDashboard({ title = "Employee Dashboard" }) {
                           View Map <ExternalLink className="h-3 w-3" aria-hidden="true" />
                         </a>
                       ) : null}
+                    </td>
+                    <td className="table-cell">
+                      {item.checkInPhoto ? (
+                        <a className="inline-flex items-center gap-1 text-xs font-bold text-slate-900" href={mediaUrl(item.checkInPhoto)} target="_blank" rel="noreferrer">
+                          View Photo <ExternalLink className="h-3 w-3" aria-hidden="true" />
+                        </a>
+                      ) : (
+                        "-"
+                      )}
                     </td>
                     <td className="table-cell">
                       <p className="font-semibold">{item.checkOutLocationStatus || "Location not available"}</p>
@@ -247,6 +292,11 @@ export default function EmployeeDashboard({ title = "Employee Dashboard" }) {
                   <p className="mt-1 text-sm font-semibold text-slate-950">{item.checkInLocationStatus || "Location not available"}</p>
                   <p className="text-xs text-slate-500">{item.checkInLatitude ?? "-"}, {item.checkInLongitude ?? "-"}</p>
                 </div>
+                {item.checkInPhoto ? (
+                  <a className="mt-3 inline-flex items-center gap-1 text-xs font-bold text-slate-900" href={mediaUrl(item.checkInPhoto)} target="_blank" rel="noreferrer">
+                    View Photo <ExternalLink className="h-3 w-3" aria-hidden="true" />
+                  </a>
+                ) : null}
               </article>
             ))}
           </div>

@@ -104,7 +104,11 @@ export default function Settings() {
           <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-5">
             <label className="space-y-1.5 xl:col-span-2">
               <span className="form-label">Office Name</span>
-              <input className="form-input" value={officeForm.officeName} onChange={updateOffice("officeName")} required />
+              <input className="form-input" list="office-place-options" value={officeForm.officeName} onChange={updateOffice("officeName")} required />
+              <datalist id="office-place-options">
+                <option value="Chennai" />
+                <option value="Hosur" />
+              </datalist>
             </label>
             <label className="space-y-1.5">
               <span className="form-label">Latitude</span>

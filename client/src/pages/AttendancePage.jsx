@@ -1,4 +1,4 @@
-import { CalendarX, ExternalLink, Filter, LogIn, LogOut, MapPin, Navigation, RefreshCcw } from "lucide-react";
+import { CalendarX, Camera, ExternalLink, Filter, LogIn, LogOut, MapPin, Navigation, RefreshCcw } from "lucide-react";
 import { useEffect, useState } from "react";
 import toast from "react-hot-toast";
 import Button from "../components/Button";
@@ -8,8 +8,12 @@ import Loading from "../components/Loading";
 import PageHeader from "../components/PageHeader";
 import StatusBadge from "../components/StatusBadge";
 import UserAvatar from "../components/UserAvatar";
+import { mediaUrl } from "../config/api";
 import { useAuth } from "../context/AuthContext";
 import api from "../services/api";
+import { uploadFile } from "../services/upload";
+import { createWatermarkedAttendancePhoto } from "../utils/attendancePhoto";
+import { getDeviceInfo } from "../utils/device";
 import { formatDate, formatDateTime } from "../utils/formatters";
 import { getAttendanceLocationPayload, googleMapsUrl } from "../utils/geolocation";
 import { roleMatches } from "../utils/formatters";
@@ -31,6 +35,7 @@ export default function AttendancePage() {
     error: "",
     loading: false
   });
+  const [attendancePhotoFile, setAttendancePhotoFile] = useState(null);
   const [loadingAction, setLoadingAction] = useState(false);
 
   const load = async () => {
@@ -79,13 +84,21 @@ export default function AttendancePage() {
     setLoadingAction(true);
     try {
       const location = await refreshLocation(false);
-      await api.post(path, {
+      const payload = {
         employee_id: user?.employeeId,
         accuracy: location.accuracy,
         latitude: location.latitude,
         locationStatus: location.locationStatus,
         longitude: location.longitude
-      });
+      };
+      if (path.includes("check-in") && attendancePhotoFile) {
+        const watermarkedPhoto = await createWatermarkedAttendancePhoto(attendancePhotoFile);
+        const uploaded = await uploadFile(watermarkedPhoto, "image");
+        payload.attendancePhoto = uploaded.url;
+        payload.attendancePhotoDevice = getDeviceInfo().deviceName;
+      }
+      await api.post(path, payload);
+      if (path.includes("check-in")) setAttendancePhotoFile(null);
       toast.success(location.locationStatus === "Captured" ? message : location.locationStatus === "Permission denied" ? "Attendance marked, but location permission was not allowed." : locationUnavailableMessage);
       await load();
     } catch (error) {
@@ -166,6 +179,30 @@ export default function AttendancePage() {
             <Button disabled={locationState.loading} icon={Navigation} onClick={() => refreshLocation()} variant="secondary">
               {locationState.loading ? "Checking GPS..." : "Refresh Location"}
             </Button>
+          </div>
+          <div className="mt-5 rounded-lg border border-slate-200 bg-slate-50 p-4 dark:border-slate-700 dark:bg-slate-900">
+            <label className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+              <span>
+                <span className="flex items-center gap-2 text-sm font-black text-slate-950 dark:text-slate-100">
+                  <Camera className="h-4 w-4" aria-hidden="true" />
+                  Attendance Photo
+                </span>
+                <span className="mt-1 block text-xs font-semibold text-slate-500 dark:text-slate-300">
+                  Optional check-in photo. A time and device watermark is added before upload.
+                </span>
+              </span>
+              <input
+                accept="image/*"
+                capture="environment"
+                className="form-input sm:max-w-xs"
+                disabled={loadingAction || Boolean(today?.checkIn) || isTodayWeekOff}
+                type="file"
+                onChange={(event) => setAttendancePhotoFile(event.target.files?.[0] || null)}
+              />
+            </label>
+            {attendancePhotoFile ? (
+              <p className="mt-2 text-xs font-semibold text-slate-500 dark:text-slate-300">{attendancePhotoFile.name}</p>
+            ) : null}
           </div>
           <div className="mt-5 grid gap-3 md:grid-cols-3">
             <div className="surface-muted p-4">
@@ -265,6 +302,7 @@ export default function AttendancePage() {
                 <th className="px-4 py-3">Check Out</th>
                 <th className="px-4 py-3">Shift</th>
                 <th className="px-4 py-3">Check-In Location</th>
+                <th className="px-4 py-3">Photo</th>
                 <th className="px-4 py-3">Check-Out Location</th>
                 <th className="px-4 py-3">Hours</th>
                 <th className="px-4 py-3">Status</th>
@@ -300,6 +338,16 @@ export default function AttendancePage() {
                         View Map <ExternalLink className="h-3 w-3" aria-hidden="true" />
                       </a>
                     ) : null}
+                  </td>
+                  <td className="table-cell">
+                    {record.checkInPhoto ? (
+                      <a className="inline-flex items-center gap-1 text-xs font-bold text-slate-900" href={mediaUrl(record.checkInPhoto)} target="_blank" rel="noreferrer">
+                        View Photo <ExternalLink className="h-3 w-3" aria-hidden="true" />
+                      </a>
+                    ) : (
+                      "-"
+                    )}
+                    {record.checkInPhotoDevice ? <p className="mt-1 text-xs text-slate-500">{record.checkInPhotoDevice}</p> : null}
                   </td>
                   <td className="table-cell">
                     <p className="font-semibold">{record.checkOutLocationStatus || "Location not available"}</p>
@@ -380,6 +428,16 @@ export default function AttendancePage() {
                       View Map <ExternalLink className="h-3 w-3" aria-hidden="true" />
                     </a>
                   ) : null}
+                </div>
+                <div>
+                  <p className="text-xs font-black uppercase text-slate-500">Photo</p>
+                  {record.checkInPhoto ? (
+                    <a className="mt-1 inline-flex items-center gap-1 text-xs font-bold text-slate-900" href={mediaUrl(record.checkInPhoto)} target="_blank" rel="noreferrer">
+                      View Photo <ExternalLink className="h-3 w-3" aria-hidden="true" />
+                    </a>
+                  ) : (
+                    <p className="mt-1 text-sm font-semibold text-slate-950">-</p>
+                  )}
                 </div>
                 <div>
                   <p className="text-xs font-black uppercase text-slate-500">Check-Out Location</p>

@@ -1,5 +1,6 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useState } from "react";
 import api from "../services/api";
+import { getDeviceInfo } from "../utils/device";
 
 const AuthContext = createContext(null);
 const TOKEN_KEY = "razk_token";
@@ -54,7 +55,10 @@ export const AuthProvider = ({ children }) => {
   }, []);
 
   const login = async (credentials) => {
+    const device = getDeviceInfo();
     const payload = {
+      deviceId: device.deviceId,
+      deviceName: device.deviceName,
       email: String(credentials.email || "").trim(),
       password: credentials.password
     };
