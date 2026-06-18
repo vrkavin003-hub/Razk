@@ -1,7 +1,8 @@
-import { CalendarCheck, Camera, Clock3, ExternalLink, LogIn, LogOut, Navigation, Send } from "lucide-react";
+import { CalendarCheck, Clock3, ExternalLink, LogIn, LogOut, Navigation, Send } from "lucide-react";
 import { useEffect, useState } from "react";
 import toast from "react-hot-toast";
 import Button from "../components/Button";
+import AttendanceCamera from "../components/AttendanceCamera";
 import DateTimeDisplay from "../components/DateTimeDisplay";
 import EmptyState from "../components/EmptyState";
 import Loading from "../components/Loading";
@@ -13,6 +14,7 @@ import { useAuth } from "../context/AuthContext";
 import api from "../services/api";
 import { uploadFile } from "../services/upload";
 import { createWatermarkedAttendancePhoto } from "../utils/attendancePhoto";
+import { ATTENDANCE_SITES } from "../utils/attendanceSites";
 import { getDeviceInfo } from "../utils/device";
 import { formatDate, formatTime } from "../utils/formatters";
 import { getAttendanceLocationPayload, googleMapsUrl } from "../utils/geolocation";
@@ -37,7 +39,8 @@ export default function EmployeeDashboard({ title = "Employee Dashboard" }) {
     error: "",
     loading: false
   });
-  const [attendancePhotoFile, setAttendancePhotoFile] = useState(null);
+  const [attendancePhoto, setAttendancePhoto] = useState(null);
+  const [attendanceSite, setAttendanceSite] = useState("");
   const [loadingAction, setLoadingAction] = useState(false);
 
   const load = async () => {
@@ -64,6 +67,16 @@ export default function EmployeeDashboard({ title = "Employee Dashboard" }) {
   };
 
   const attendanceAction = async (path, successMessage) => {
+    const isCheckIn = path.includes("check-in");
+    if (isCheckIn && !attendanceSite) {
+      toast.error("Select Chennai or Hosur before check-in");
+      return;
+    }
+    if (isCheckIn && !attendancePhoto?.file) {
+      toast.error("Take an attendance photo before check-in");
+      return;
+    }
+
     setLoadingAction(true);
     try {
       const location = await refreshLocation(false);
@@ -74,14 +87,22 @@ export default function EmployeeDashboard({ title = "Employee Dashboard" }) {
         locationStatus: location.locationStatus,
         longitude: location.longitude
       };
-      if (path.includes("check-in") && attendancePhotoFile) {
-        const watermarkedPhoto = await createWatermarkedAttendancePhoto(attendancePhotoFile);
+      if (isCheckIn) {
+        const watermarkedPhoto = await createWatermarkedAttendancePhoto(attendancePhoto.file, {
+          capturedAt: attendancePhoto.capturedAt,
+          site: attendanceSite
+        });
         const uploaded = await uploadFile(watermarkedPhoto, "image");
         payload.attendancePhoto = uploaded.url;
         payload.attendancePhotoDevice = getDeviceInfo().deviceName;
+        payload.attendancePhotoCapturedAt = new Date(attendancePhoto.capturedAt).toISOString();
+        payload.attendanceSite = attendanceSite;
       }
       await api.post(path, payload);
-      if (path.includes("check-in")) setAttendancePhotoFile(null);
+      if (isCheckIn) {
+        setAttendancePhoto(null);
+        setAttendanceSite("");
+      }
       toast.success(location.locationStatus === "Captured" ? successMessage : location.locationStatus === "Permission denied" ? "Attendance marked, but location permission was not allowed." : locationUnavailableMessage);
       await load();
     } catch (error) {
@@ -130,7 +151,7 @@ export default function EmployeeDashboard({ title = "Employee Dashboard" }) {
           </div>
           <div className="mt-5 flex flex-wrap gap-3">
             <Button
-              disabled={loadingAction || Boolean(dashboard.attendance?.checkIn)}
+              disabled={loadingAction || Boolean(dashboard.attendance?.checkIn) || !attendanceSite || !attendancePhoto?.file}
               icon={LogIn}
               onClick={() => attendanceAction("/attendance/check-in", "Check-in marked successfully.")}
             >
@@ -152,27 +173,30 @@ export default function EmployeeDashboard({ title = "Employee Dashboard" }) {
               {locationState.loading ? "Checking GPS..." : "Refresh Location"}
             </Button>
           </div>
-          <div className="mt-5 rounded-lg border border-slate-200 bg-slate-50 p-4">
-            <label className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
-              <span>
-                <span className="flex items-center gap-2 text-sm font-black text-slate-950">
-                  <Camera className="h-4 w-4" aria-hidden="true" />
-                  Attendance Photo
-                </span>
-                <span className="mt-1 block text-xs font-semibold text-slate-500">
-                  Optional check-in photo with automatic time and device watermark.
-                </span>
-              </span>
-              <input
-                accept="image/*"
-                capture="environment"
-                className="form-input sm:max-w-xs"
+          <div className="mt-5 grid gap-4 rounded-lg border border-slate-200 bg-slate-50 p-4 md:grid-cols-[220px_1fr]">
+            <label className="space-y-1.5">
+              <span className="form-label">Attendance Site</span>
+              <select
+                className="form-input"
                 disabled={loadingAction || Boolean(dashboard.attendance?.checkIn)}
-                type="file"
-                onChange={(event) => setAttendancePhotoFile(event.target.files?.[0] || null)}
-              />
+                value={attendanceSite}
+                onChange={(event) => setAttendanceSite(event.target.value)}
+              >
+                <option value="">Select site</option>
+                {ATTENDANCE_SITES.map((site) => <option key={site} value={site}>{site}</option>)}
+              </select>
             </label>
-            {attendancePhotoFile ? <p className="mt-2 text-xs font-semibold text-slate-500">{attendancePhotoFile.name}</p> : null}
+            <div>
+              <p className="form-label">Attendance Photo</p>
+              <p className="mb-2 mt-1 text-xs font-semibold text-slate-500">
+                Required for check-in. Site, date, time, and device are added to the image.
+              </p>
+              <AttendanceCamera
+                disabled={loadingAction || Boolean(dashboard.attendance?.checkIn)}
+                photo={attendancePhoto}
+                onChange={setAttendancePhoto}
+              />
+            </div>
           </div>
           <div className="mt-5 grid gap-3 md:grid-cols-3">
             <div className="surface-muted p-4">
@@ -213,6 +237,7 @@ export default function EmployeeDashboard({ title = "Employee Dashboard" }) {
                   <th className="px-4 py-3">In</th>
                   <th className="px-4 py-3">Out</th>
                   <th className="px-4 py-3">Shift</th>
+                  <th className="px-4 py-3">Site</th>
                   <th className="px-4 py-3">In Location</th>
                   <th className="px-4 py-3">Photo</th>
                   <th className="px-4 py-3">Out Location</th>
@@ -228,6 +253,7 @@ export default function EmployeeDashboard({ title = "Employee Dashboard" }) {
                     <td className="table-cell">{formatTime(item.checkIn)}</td>
                     <td className="table-cell">{formatTime(item.checkOut)}</td>
                     <td className="table-cell font-semibold">{attendanceShift(item)}</td>
+                    <td className="table-cell font-semibold">{item.attendanceSite || "-"}</td>
                     <td className="table-cell">
                       <p className="font-semibold">{item.checkInLocationStatus || "Location not available"}</p>
                       <p className="text-xs text-slate-500">{item.checkInLatitude ?? "-"}, {item.checkInLongitude ?? "-"}</p>
@@ -286,6 +312,10 @@ export default function EmployeeDashboard({ title = "Employee Dashboard" }) {
                     <p className="text-xs font-black uppercase text-slate-500">Check Out</p>
                     <p className="mt-1 font-semibold text-slate-950">{formatTime(item.checkOut)}</p>
                   </div>
+                </div>
+                <div className="mt-3">
+                  <p className="text-xs font-black uppercase text-slate-500">Site</p>
+                  <p className="mt-1 text-sm font-semibold text-slate-950">{item.attendanceSite || "-"}</p>
                 </div>
                 <div className="mt-3">
                   <p className="text-xs font-black uppercase text-slate-500">Location</p>

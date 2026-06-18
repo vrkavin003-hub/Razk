@@ -58,6 +58,44 @@ const userSchema = new mongoose.Schema(
     address: String,
     emergencyContact: String,
     profilePhoto: String,
+    registeredDeviceId: {
+      type: String,
+      trim: true
+    },
+    registeredDeviceName: {
+      type: String,
+      trim: true
+    },
+    deviceRegisteredAt: Date,
+    deviceApprovalStatus: {
+      type: String,
+      enum: ["none", "pending", "approved", "rejected"],
+      default: "none"
+    },
+    pendingDeviceId: {
+      type: String,
+      trim: true
+    },
+    pendingDeviceName: {
+      type: String,
+      trim: true
+    },
+    deviceRequestedAt: Date,
+    deviceApprovedAt: Date,
+    deviceApprovedBy: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "User"
+    },
+    deviceRejectedAt: Date,
+    deviceRejectedBy: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "User"
+    },
+    deviceResetAt: Date,
+    deviceResetBy: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "User"
+    },
     isActive: {
       type: Boolean,
       default: true
@@ -84,6 +122,8 @@ userSchema.methods.toJSON = function toJSON() {
   delete user.password;
   delete user.resetPasswordToken;
   delete user.resetPasswordExpires;
+  delete user.registeredDeviceId;
+  delete user.pendingDeviceId;
   return user;
 };
 

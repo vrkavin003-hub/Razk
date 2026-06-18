@@ -116,7 +116,7 @@ const styleDataRow = (row, index) => {
 };
 
 const addKeyValueRows = (sheet, startRow, title, rows) => {
-  sheet.mergeCells(`A${startRow}:L${startRow}`);
+  sheet.mergeCells(`A${startRow}:M${startRow}`);
   styleSectionTitle(sheet.getCell(`A${startRow}`));
   sheet.getCell(`A${startRow}`).value = title;
   let rowNumber = startRow + 1;
@@ -143,7 +143,7 @@ const addEmployeeReportSheet = (workbook, report) => {
     pageSetup: { orientation: "landscape", fitToPage: true, fitToWidth: 1, fitToHeight: 0 }
   });
   sheet.views = [{ state: "frozen", ySplit: 11 }];
-  setColumnWidths(sheet, [14, 11, 14, 14, 18, 15, 18, 24, 24, 12, 14, 34]);
+  setColumnWidths(sheet, [14, 11, 14, 14, 18, 14, 15, 18, 24, 24, 12, 14, 34]);
   addHeader(workbook, sheet, report, "M");
 
   let nextRow = addKeyValueRows(sheet, 5, "Employee Details", [
@@ -160,6 +160,7 @@ const addEmployeeReportSheet = (workbook, report) => {
     "Check-in",
     "Check-out",
     "Shift",
+    "Site",
     "Working Hours",
     "Status",
     "Check-in Location",
@@ -178,6 +179,7 @@ const addEmployeeReportSheet = (workbook, report) => {
       formatTime(record.checkIn),
       formatTime(record.checkOut),
       record.shiftName || "Not marked",
+      record.attendanceSite || "-",
       Number(record.workingHours || 0),
       record.status,
       gpsText(record.checkInLatitude, record.checkInLongitude, record.checkInLocationStatus),
@@ -192,7 +194,7 @@ const addEmployeeReportSheet = (workbook, report) => {
   const footerRow = nextRow + 2 + report.records.length;
   sheet.mergeCells(`A${footerRow}:D${footerRow}`);
   sheet.mergeCells(`E${footerRow}:H${footerRow}`);
-  sheet.mergeCells(`I${footerRow}:L${footerRow}`);
+  sheet.mergeCells(`I${footerRow}:M${footerRow}`);
   sheet.getCell(`A${footerRow}`).value = "Prepared by";
   sheet.getCell(`E${footerRow}`).value = "HR Manager Signature";
   sheet.getCell(`I${footerRow}`).value = "Authorized Signature";
@@ -209,7 +211,7 @@ const addSummaryReportSheet = (workbook, report) => {
   });
   sheet.views = [{ state: "frozen", ySplit: 9 }];
   setColumnWidths(sheet, [8, 16, 24, 18, 20, 10, 10, 10, 10, 10, 10, 14, 14]);
-  addHeader(workbook, sheet, report, "L");
+  addHeader(workbook, sheet, report, "M");
 
   let nextRow = addKeyValueRows(sheet, 5, "Report Details", [
     ["Report Type", report.type, "Date Range", `${formatDate(report.from)} to ${formatDate(report.to)}`],
@@ -263,7 +265,7 @@ const addSummaryReportSheet = (workbook, report) => {
     pageSetup: { orientation: "landscape", fitToPage: true, fitToWidth: 1, fitToHeight: 0 }
   });
   detailSheet.views = [{ state: "frozen", ySplit: 1 }];
-  setColumnWidths(detailSheet, [16, 24, 14, 10, 14, 14, 18, 14, 12, 28, 28, 32]);
+  setColumnWidths(detailSheet, [16, 24, 14, 10, 14, 14, 18, 14, 14, 12, 28, 28, 32]);
   const detailHeader = detailSheet.getRow(1);
   detailHeader.values = [
     "Employee ID",
@@ -273,6 +275,7 @@ const addSummaryReportSheet = (workbook, report) => {
     "Check-in",
     "Check-out",
     "Shift",
+    "Site",
     "Status",
     "Hours",
     "Check-in Location",
@@ -292,6 +295,7 @@ const addSummaryReportSheet = (workbook, report) => {
         formatTime(record.checkIn),
         formatTime(record.checkOut),
         record.shiftName || "Not marked",
+        record.attendanceSite || "-",
         record.status,
         Number(record.workingHours || 0),
         gpsText(record.checkInLatitude, record.checkInLongitude, record.checkInLocationStatus),

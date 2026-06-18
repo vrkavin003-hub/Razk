@@ -31,6 +31,13 @@ const attendanceSchema = new mongoose.Schema(
     },
     checkInLocationCapturedAt: Date,
     checkInDistanceMeters: Number,
+    attendanceSite: {
+      type: String,
+      enum: ["Chennai", "Hosur"]
+    },
+    checkInPhoto: String,
+    checkInPhotoDevice: String,
+    checkInPhotoCapturedAt: Date,
     checkOut: Date,
     checkOutLatitude: Number,
     checkOutLongitude: Number,

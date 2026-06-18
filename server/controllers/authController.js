@@ -2,6 +2,7 @@ const crypto = require("crypto");
 const jwt = require("jsonwebtoken");
 const { getJwtSecret } = require("../config/authSecret");
 const asyncHandler = require("../utils/asyncHandler");
+const { normalizeDeviceId, normalizeDeviceName } = require("../utils/deviceApproval");
 const User = require("../models/User");
 
 const generateToken = (id) =>
@@ -25,6 +26,14 @@ const sanitizeUser = (user) => ({
   address: user.address,
   emergencyContact: user.emergencyContact,
   profilePhoto: user.profilePhoto,
+  registeredDeviceName: user.registeredDeviceName,
+  deviceRegisteredAt: user.deviceRegisteredAt,
+  deviceApprovalStatus: user.deviceApprovalStatus,
+  pendingDeviceName: user.pendingDeviceName,
+  deviceRequestedAt: user.deviceRequestedAt,
+  deviceApprovedAt: user.deviceApprovedAt,
+  deviceRejectedAt: user.deviceRejectedAt,
+  deviceResetAt: user.deviceResetAt,
   isActive: user.isActive
 });
 
@@ -45,7 +54,7 @@ const register = asyncHandler(async (req, res) => {
 });
 
 const login = asyncHandler(async (req, res) => {
-  const { email, password } = req.body;
+  const { deviceId, deviceName, email, password } = req.body;
 
   if (!email || !password) {
     res.status(400);
@@ -64,6 +73,62 @@ const login = asyncHandler(async (req, res) => {
   if (!user || !user.isActive || !(await user.matchPassword(password))) {
     res.status(401);
     throw new Error("Invalid email or password");
+  }
+
+  if (user.role === "employee") {
+    if (!user.employeeId) {
+      res.status(403);
+      throw new Error("Employee ID is not configured for this account. Please contact HR.");
+    }
+    if (loginId.toLowerCase() !== String(user.employeeId).toLowerCase()) {
+      res.status(400);
+      throw new Error("Employees must login using their Employee ID");
+    }
+    const normalizedDeviceId = normalizeDeviceId(deviceId);
+    const normalizedDeviceName = normalizeDeviceName(deviceName);
+    if (!normalizedDeviceId) {
+      res.status(400);
+      throw new Error("A valid device ID is required for employee login");
+    }
+
+    if (user.registeredDeviceId === normalizedDeviceId) {
+      if (user.deviceApprovalStatus !== "approved") {
+        user.deviceApprovalStatus = "approved";
+        user.deviceApprovedAt = user.deviceApprovedAt || user.deviceRegisteredAt || new Date();
+        await user.save();
+      }
+    } else if (user.registeredDeviceId) {
+      res.status(403);
+      throw new Error("This employee account is registered to another device. Please contact HR.");
+    } else {
+      if (user.deviceApprovalStatus === "rejected") {
+        res.status(403);
+        throw new Error("Your device approval request was rejected by HR. Please contact HR.");
+      }
+      if (user.deviceApprovalStatus === "pending" && user.pendingDeviceId && user.pendingDeviceId !== normalizedDeviceId) {
+        res.status(403);
+        throw new Error("A device approval request is already pending for this employee. Please contact HR.");
+      }
+      if (user.deviceApprovalStatus === "pending" && user.pendingDeviceId === normalizedDeviceId) {
+        res.status(202).json({
+          requiresDeviceApproval: true,
+          message: "Your device approval request is pending with HR. You can login after HR approves this device."
+        });
+        return;
+      }
+      user.pendingDeviceId = normalizedDeviceId;
+      user.pendingDeviceName = normalizedDeviceName;
+      user.deviceRequestedAt = new Date();
+      user.deviceApprovalStatus = "pending";
+      user.deviceRejectedAt = undefined;
+      user.deviceRejectedBy = undefined;
+      await user.save();
+      res.status(202).json({
+        requiresDeviceApproval: true,
+        message: "Your device approval request has been sent to HR. You can login after HR approves this device."
+      });
+      return;
+    }
   }
 
   res.json({

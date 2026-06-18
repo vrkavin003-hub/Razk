@@ -1,4 +1,4 @@
-import { Edit, Plus, RotateCcw, Search, Trash2 } from "lucide-react";
+import { CheckCircle2, Edit, Plus, RotateCcw, Search, Trash2, XCircle } from "lucide-react";
 import { useEffect, useState } from "react";
 import toast from "react-hot-toast";
 import { Link } from "react-router-dom";
@@ -13,9 +13,10 @@ import { formatDateTime, initials } from "../utils/formatters";
 
 export default function EmployeesList() {
   const { user } = useAuth();
-  const canResetDevice = user?.role === "admin";
+  const canManageDevice = user?.role === "hr";
   const [employees, setEmployees] = useState(null);
   const [search, setSearch] = useState("");
+  const [deviceActionId, setDeviceActionId] = useState("");
 
   const load = async () => {
     const { data } = await api.get("/employees", { params: search ? { search } : {} });
@@ -38,13 +39,44 @@ export default function EmployeesList() {
   };
 
   const resetDevice = async (employee) => {
-    if (!window.confirm(`Reset registered device for ${employee.name}? They will be able to login from a new phone after reset.`)) return;
+    if (!window.confirm(`Reset this employee's registered device? The employee must request approval again from the new device.\n\n${employee.name} (${employee.employeeId})`)) return;
+    setDeviceActionId(employee._id);
     try {
       await api.patch(`/employees/${employee._id}/reset-device`);
       toast.success("Employee device reset");
       await load();
     } catch (error) {
       toast.error(error.message);
+    } finally {
+      setDeviceActionId("");
+    }
+  };
+
+  const approveDevice = async (employee) => {
+    if (!window.confirm(`Approve this device for the employee? Only this device will be allowed to login.\n\n${employee.name} (${employee.employeeId})`)) return;
+    setDeviceActionId(employee._id);
+    try {
+      await api.patch(`/employees/${employee._id}/device/approve`);
+      toast.success("Employee device approved");
+      await load();
+    } catch (error) {
+      toast.error(error.message);
+    } finally {
+      setDeviceActionId("");
+    }
+  };
+
+  const rejectDevice = async (employee) => {
+    if (!window.confirm(`Reject this employee device request?\n\n${employee.name} (${employee.employeeId})`)) return;
+    setDeviceActionId(employee._id);
+    try {
+      await api.patch(`/employees/${employee._id}/device/reject`);
+      toast.success("Employee device request rejected");
+      await load();
+    } catch (error) {
+      toast.error(error.message);
+    } finally {
+      setDeviceActionId("");
     }
   };
 
@@ -120,14 +152,31 @@ export default function EmployeesList() {
                   <td className="table-cell">
                     {employee.role === "employee" ? (
                       <div>
-                        <p className="font-semibold text-slate-900 dark:text-slate-100">
-                          {employee.registeredDeviceId ? "Device registered" : "No device registered"}
-                        </p>
-                        {employee.registeredDeviceName ? (
-                          <p className="text-xs text-slate-500 dark:text-slate-300">{employee.registeredDeviceName}</p>
+                        <StatusBadge
+                          status={
+                            employee.deviceApprovalStatus === "approved" || employee.registeredDeviceName
+                              ? "Approved"
+                              : employee.deviceApprovalStatus === "pending"
+                                ? "Pending"
+                                : employee.deviceApprovalStatus === "rejected"
+                                  ? "Rejected"
+                                  : "Not Registered"
+                          }
+                        />
+                        {employee.pendingDeviceName || employee.registeredDeviceName ? (
+                          <p className="mt-1 text-xs text-slate-500 dark:text-slate-300">
+                            {employee.pendingDeviceName || employee.registeredDeviceName}
+                          </p>
                         ) : null}
-                        {employee.deviceRegisteredAt ? (
-                          <p className="text-xs text-slate-500 dark:text-slate-300">{formatDateTime(employee.deviceRegisteredAt)}</p>
+                        {employee.deviceRequestedAt || employee.deviceRegisteredAt ? (
+                          <p className="text-xs text-slate-500 dark:text-slate-300">
+                            {formatDateTime(employee.deviceRequestedAt || employee.deviceRegisteredAt)}
+                          </p>
+                        ) : null}
+                        {employee.deviceRejectedAt ? (
+                          <p className="text-xs font-semibold text-rose-600 dark:text-rose-200">
+                            Rejected {formatDateTime(employee.deviceRejectedAt)}
+                          </p>
                         ) : null}
                       </div>
                     ) : (
@@ -138,7 +187,7 @@ export default function EmployeesList() {
                     <StatusBadge status={employee.isActive ? "Present" : "Rejected"} />
                   </td>
                   <td className="table-cell">
-                    <div className="flex gap-2">
+                    <div className="flex flex-wrap gap-2">
                       <Link to={`/employees/${employee._id}/edit`}>
                         <Button icon={Edit} size="sm" variant="secondary">
                           Edit
@@ -147,9 +196,19 @@ export default function EmployeesList() {
                       <Button icon={Trash2} onClick={() => remove(employee)} size="sm" variant="danger">
                         Deactivate
                       </Button>
-                      {canResetDevice && employee.role === "employee" ? (
-                        <Button icon={RotateCcw} onClick={() => resetDevice(employee)} size="sm" variant="warning">
-                          Reset Device
+                      {canManageDevice && employee.role === "employee" && employee.deviceApprovalStatus === "pending" ? (
+                        <>
+                          <Button disabled={Boolean(deviceActionId)} icon={CheckCircle2} onClick={() => approveDevice(employee)} size="sm" variant="success">
+                            {deviceActionId === employee._id ? "Processing..." : "Approve Device"}
+                          </Button>
+                          <Button disabled={Boolean(deviceActionId)} icon={XCircle} onClick={() => rejectDevice(employee)} size="sm" variant="danger">
+                            Reject Device
+                          </Button>
+                        </>
+                      ) : null}
+                      {canManageDevice && employee.role === "employee" && (employee.deviceApprovalStatus === "approved" || employee.deviceApprovalStatus === "rejected" || employee.registeredDeviceName) ? (
+                        <Button disabled={Boolean(deviceActionId)} icon={RotateCcw} onClick={() => resetDevice(employee)} size="sm" variant="warning">
+                          {deviceActionId === employee._id ? "Processing..." : "Reset Device"}
                         </Button>
                       ) : null}
                     </div>

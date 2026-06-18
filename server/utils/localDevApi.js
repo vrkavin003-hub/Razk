@@ -8,6 +8,8 @@ const toCsv = require("./csv");
 const { daysBetweenInclusive, getWorkingHours, isLateCheckIn, toDateKey } = require("./dates");
 const { buildLocationDecision, normalizeAttendanceLocation, validateCoordinates } = require("./geo");
 const { getShiftFromCheckIn } = require("./shifts");
+const { normalizeAttendanceSite } = require("./attendanceSites");
+const { normalizeDeviceId, normalizeDeviceName } = require("./deviceApproval");
 const { fileUrl, upload } = require("../middleware/uploadMiddleware");
 const {
   PAID_LEAVE_DAYS_PER_YEAR,
@@ -169,6 +171,8 @@ const sanitizeUser = (user) => {
   delete safe.password;
   delete safe.resetPasswordToken;
   delete safe.resetPasswordExpires;
+  delete safe.registeredDeviceId;
+  delete safe.pendingDeviceId;
   return safe;
 };
 
@@ -455,11 +459,63 @@ const mountLocalDevApi = (app) => {
   app.post(
     "/api/auth/login",
     asyncRoute(async (req, res) => {
-      const { email, password } = req.body;
-      const user = db.users.find((item) => item.email === String(email || "").toLowerCase() && item.isActive);
+      const { deviceId, deviceName, email, password } = req.body;
+      const loginId = String(email || "").trim();
+      const user = db.users.find(
+        (item) =>
+          item.isActive &&
+          (
+            item.email === loginId.toLowerCase() ||
+            String(item.employeeId || "").toLowerCase() === loginId.toLowerCase()
+          )
+      );
 
       if (!user || !(await bcrypt.compare(password || "", user.password))) {
         return json(res, { message: "Invalid email or password" }, 401);
+      }
+
+      if (user.role === "employee") {
+        if (!user.employeeId) {
+          return json(res, { message: "Employee ID is not configured for this account. Please contact HR." }, 403);
+        }
+        if (loginId.toLowerCase() !== String(user.employeeId).toLowerCase()) {
+          return json(res, { message: "Employees must login using their Employee ID" }, 400);
+        }
+        const normalizedDeviceId = normalizeDeviceId(deviceId);
+        const normalizedDeviceName = normalizeDeviceName(deviceName);
+        if (!normalizedDeviceId) {
+          return json(res, { message: "A valid device ID is required for employee login" }, 400);
+        }
+        if (user.registeredDeviceId === normalizedDeviceId) {
+          user.deviceApprovalStatus = "approved";
+          saveDb();
+        } else if (user.registeredDeviceId) {
+          return json(res, { message: "This employee account is registered to another device. Please contact HR." }, 403);
+        } else {
+          if (user.deviceApprovalStatus === "rejected") {
+            return json(res, { message: "Your device approval request was rejected by HR. Please contact HR." }, 403);
+          }
+          if (user.deviceApprovalStatus === "pending" && user.pendingDeviceId && user.pendingDeviceId !== normalizedDeviceId) {
+            return json(res, { message: "A device approval request is already pending for this employee. Please contact HR." }, 403);
+          }
+          if (user.deviceApprovalStatus === "pending" && user.pendingDeviceId === normalizedDeviceId) {
+            return json(res, {
+              requiresDeviceApproval: true,
+              message: "Your device approval request is pending with HR. You can login after HR approves this device."
+            }, 202);
+          }
+          user.pendingDeviceId = normalizedDeviceId;
+          user.pendingDeviceName = normalizedDeviceName;
+          user.deviceRequestedAt = new Date().toISOString();
+          user.deviceApprovalStatus = "pending";
+          delete user.deviceRejectedAt;
+          delete user.deviceRejectedBy;
+          saveDb();
+          return json(res, {
+            requiresDeviceApproval: true,
+            message: "Your device approval request has been sent to HR. You can login after HR approves this device."
+          }, 202);
+        }
       }
 
       return json(res, {
@@ -643,6 +699,7 @@ const mountLocalDevApi = (app) => {
         "department",
         "designation",
         "assignedShift",
+        "weeklyWeekOffDay",
         "phone",
         "joiningDate",
         "address",
@@ -662,6 +719,72 @@ const mountLocalDevApi = (app) => {
       return json(res, { employee: sanitizeUser(employee) });
     })
   );
+
+  app.get("/api/employees/device-requests/pending", protect, authorize("hr"), (req, res) => {
+    const requests = db.users
+      .filter((user) => user.isActive && user.role === "employee" && user.deviceApprovalStatus === "pending")
+      .map(sanitizeUser)
+      .sort((a, b) => String(a.deviceRequestedAt).localeCompare(String(b.deviceRequestedAt)));
+    return json(res, { requests });
+  });
+
+  app.patch("/api/employees/:id/device/approve", protect, authorize("hr"), (req, res) => {
+    const employee = matchUser(req.params.id);
+    if (!employee || employee.role !== "employee" || employee.deviceApprovalStatus !== "pending" || !employee.pendingDeviceId) {
+      return json(res, { message: "Employee device request not found" }, 404);
+    }
+    employee.registeredDeviceId = employee.pendingDeviceId;
+    employee.registeredDeviceName = employee.pendingDeviceName || "Unknown device";
+    employee.deviceRegisteredAt = new Date().toISOString();
+    employee.deviceApprovalStatus = "approved";
+    employee.deviceApprovedAt = new Date().toISOString();
+    employee.deviceApprovedBy = req.user._id;
+    delete employee.deviceRejectedAt;
+    delete employee.deviceRejectedBy;
+    delete employee.pendingDeviceId;
+    delete employee.pendingDeviceName;
+    delete employee.deviceRequestedAt;
+    employee.updatedAt = new Date().toISOString();
+    saveDb();
+    return json(res, { employee: sanitizeUser(employee), message: "Employee device approved successfully" });
+  });
+
+  app.patch("/api/employees/:id/device/reject", protect, authorize("hr"), (req, res) => {
+    const employee = matchUser(req.params.id);
+    if (!employee || employee.role !== "employee" || employee.deviceApprovalStatus !== "pending") {
+      return json(res, { message: "Employee device request not found" }, 404);
+    }
+    employee.deviceApprovalStatus = "rejected";
+    employee.deviceRejectedAt = new Date().toISOString();
+    employee.deviceRejectedBy = req.user._id;
+    employee.updatedAt = new Date().toISOString();
+    saveDb();
+    return json(res, { employee: sanitizeUser(employee), message: "Employee device request rejected" });
+  });
+
+  app.patch("/api/employees/:id/reset-device", protect, authorize("hr"), (req, res) => {
+    const employee = matchUser(req.params.id);
+    if (!employee) return json(res, { message: "Employee not found" }, 404);
+    if (employee.role !== "employee") {
+      return json(res, { message: "Device reset is available only for employee accounts" }, 400);
+    }
+    delete employee.registeredDeviceId;
+    delete employee.registeredDeviceName;
+    delete employee.deviceRegisteredAt;
+    delete employee.pendingDeviceId;
+    delete employee.pendingDeviceName;
+    delete employee.deviceRequestedAt;
+    delete employee.deviceApprovedAt;
+    delete employee.deviceApprovedBy;
+    delete employee.deviceRejectedAt;
+    delete employee.deviceRejectedBy;
+    employee.deviceApprovalStatus = "none";
+    employee.deviceResetAt = new Date().toISOString();
+    employee.deviceResetBy = req.user._id;
+    employee.updatedAt = new Date().toISOString();
+    saveDb();
+    return json(res, { employee: sanitizeUser(employee), message: "Employee device reset successfully" });
+  });
 
   app.delete("/api/employees/:id", protect, authorize("admin", "hr"), (req, res) => {
     const employee = matchUser(req.params.id);
@@ -762,6 +885,21 @@ const mountLocalDevApi = (app) => {
     }
     const now = new Date();
     const location = normalizeAttendanceLocation(req.body, now);
+    const attendanceSite = normalizeAttendanceSite(req.body.attendanceSite);
+    if (!attendanceSite) return json(res, { message: "Select a valid attendance site: Chennai or Hosur" }, 400);
+    const attendancePhoto = String(req.body.attendancePhoto || "").trim();
+    if (!attendancePhoto) return json(res, { message: "Attendance photo is required for check-in" }, 400);
+    if (!/^\/uploads\/images\/[^/?#]+$/.test(attendancePhoto)) {
+      return json(res, { message: "Attendance photo must be uploaded before check-in" }, 400);
+    }
+    const requestedCaptureTime = new Date(req.body.attendancePhotoCapturedAt || now);
+    if (
+      Number.isNaN(requestedCaptureTime.getTime()) ||
+      requestedCaptureTime.getTime() > now.getTime() + 5 * 60 * 1000 ||
+      requestedCaptureTime.getTime() < now.getTime() - 24 * 60 * 60 * 1000
+    ) {
+      return json(res, { message: "Attendance photo capture time is invalid" }, 400);
+    }
     const shiftName = getShiftFromCheckIn(now, req.user.assignedShift);
     const attendance = {
       _id: newId(),
@@ -776,6 +914,10 @@ const mountLocalDevApi = (app) => {
       checkInLocationStatus: location.locationStatus,
       checkInLocationCapturedAt: location.capturedAt.toISOString(),
       checkInDistanceMeters: null,
+      attendanceSite,
+      checkInPhoto: attendancePhoto,
+      checkInPhotoDevice: normalizeDeviceName(req.body.attendancePhotoDevice),
+      checkInPhotoCapturedAt: requestedCaptureTime.toISOString(),
       checkOut: null,
       checkOutLatitude: null,
       checkOutLongitude: null,
@@ -864,6 +1006,7 @@ const mountLocalDevApi = (app) => {
         "Check In",
         "Check Out",
         "Shift",
+        "Site",
         "Working Hours",
         "Status",
         "Check-in Latitude",
@@ -884,6 +1027,7 @@ const mountLocalDevApi = (app) => {
         record.checkIn || "",
         record.checkOut || "",
         record.shiftName || getShiftFromCheckIn(record.checkIn, record.employee?.assignedShift),
+        record.attendanceSite || "-",
         record.workingHours,
         record.status,
         record.checkInLatitude ?? "",

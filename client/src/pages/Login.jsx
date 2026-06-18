@@ -133,11 +133,11 @@ export default function Login() {
               <CompanyLogo className="mb-7" />
               <p className="text-xs font-black uppercase tracking-[0.18em] text-hya-700 dark:text-blue-100">Secure Login</p>
               <h2 className="mt-2 text-3xl font-black text-[#020617] dark:text-[#f8fbff]">Welcome back</h2>
-              <p className="mt-2 text-sm leading-6 text-slate-500 dark:text-[#9bb8df]">Sign in with your Razk Automation email or login ID.</p>
+              <p className="mt-2 text-sm leading-6 text-slate-500 dark:text-[#9bb8df]">Employees use Employee ID. Admin and HR use their assigned email or login credentials.</p>
             </div>
             <div className="mt-7 space-y-4">
               <label className="space-y-1.5">
-                <span className="form-label">Email / Login ID</span>
+                <span className="form-label">Employee ID / Admin or HR Email</span>
                 <div className="relative">
                   <Mail className="pointer-events-none absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
                   <input

@@ -1,7 +1,8 @@
-import { CalendarX, Camera, ExternalLink, Filter, LogIn, LogOut, MapPin, Navigation, RefreshCcw } from "lucide-react";
+import { CalendarX, ExternalLink, Filter, LogIn, LogOut, MapPin, Navigation, RefreshCcw } from "lucide-react";
 import { useEffect, useState } from "react";
 import toast from "react-hot-toast";
 import Button from "../components/Button";
+import AttendanceCamera from "../components/AttendanceCamera";
 import DateTimeDisplay from "../components/DateTimeDisplay";
 import EmptyState from "../components/EmptyState";
 import Loading from "../components/Loading";
@@ -13,6 +14,7 @@ import { useAuth } from "../context/AuthContext";
 import api from "../services/api";
 import { uploadFile } from "../services/upload";
 import { createWatermarkedAttendancePhoto } from "../utils/attendancePhoto";
+import { ATTENDANCE_SITES } from "../utils/attendanceSites";
 import { getDeviceInfo } from "../utils/device";
 import { formatDate, formatDateTime } from "../utils/formatters";
 import { getAttendanceLocationPayload, googleMapsUrl } from "../utils/geolocation";
@@ -35,7 +37,8 @@ export default function AttendancePage() {
     error: "",
     loading: false
   });
-  const [attendancePhotoFile, setAttendancePhotoFile] = useState(null);
+  const [attendancePhoto, setAttendancePhoto] = useState(null);
+  const [attendanceSite, setAttendanceSite] = useState("");
   const [loadingAction, setLoadingAction] = useState(false);
 
   const load = async () => {
@@ -81,6 +84,16 @@ export default function AttendancePage() {
   };
 
   const attendanceAction = async (path, message) => {
+    const isCheckIn = path.includes("check-in");
+    if (isCheckIn && !attendanceSite) {
+      toast.error("Select Chennai or Hosur before check-in");
+      return;
+    }
+    if (isCheckIn && !attendancePhoto?.file) {
+      toast.error("Take an attendance photo before check-in");
+      return;
+    }
+
     setLoadingAction(true);
     try {
       const location = await refreshLocation(false);
@@ -91,14 +104,22 @@ export default function AttendancePage() {
         locationStatus: location.locationStatus,
         longitude: location.longitude
       };
-      if (path.includes("check-in") && attendancePhotoFile) {
-        const watermarkedPhoto = await createWatermarkedAttendancePhoto(attendancePhotoFile);
+      if (isCheckIn) {
+        const watermarkedPhoto = await createWatermarkedAttendancePhoto(attendancePhoto.file, {
+          capturedAt: attendancePhoto.capturedAt,
+          site: attendanceSite
+        });
         const uploaded = await uploadFile(watermarkedPhoto, "image");
         payload.attendancePhoto = uploaded.url;
         payload.attendancePhotoDevice = getDeviceInfo().deviceName;
+        payload.attendancePhotoCapturedAt = new Date(attendancePhoto.capturedAt).toISOString();
+        payload.attendanceSite = attendanceSite;
       }
       await api.post(path, payload);
-      if (path.includes("check-in")) setAttendancePhotoFile(null);
+      if (isCheckIn) {
+        setAttendancePhoto(null);
+        setAttendanceSite("");
+      }
       toast.success(location.locationStatus === "Captured" ? message : location.locationStatus === "Permission denied" ? "Attendance marked, but location permission was not allowed." : locationUnavailableMessage);
       await load();
     } catch (error) {
@@ -157,7 +178,7 @@ export default function AttendancePage() {
           </div>
           <div className="mt-5 flex flex-wrap gap-3">
             <Button
-              disabled={loadingAction || Boolean(today?.checkIn) || isTodayWeekOff}
+              disabled={loadingAction || Boolean(today?.checkIn) || isTodayWeekOff || !attendanceSite || !attendancePhoto?.file}
               icon={LogIn}
               onClick={() => attendanceAction("/attendance/check-in", "Check-in marked successfully.")}
             >
@@ -180,29 +201,30 @@ export default function AttendancePage() {
               {locationState.loading ? "Checking GPS..." : "Refresh Location"}
             </Button>
           </div>
-          <div className="mt-5 rounded-lg border border-slate-200 bg-slate-50 p-4 dark:border-slate-700 dark:bg-slate-900">
-            <label className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
-              <span>
-                <span className="flex items-center gap-2 text-sm font-black text-slate-950 dark:text-slate-100">
-                  <Camera className="h-4 w-4" aria-hidden="true" />
-                  Attendance Photo
-                </span>
-                <span className="mt-1 block text-xs font-semibold text-slate-500 dark:text-slate-300">
-                  Optional check-in photo. A time and device watermark is added before upload.
-                </span>
-              </span>
-              <input
-                accept="image/*"
-                capture="environment"
-                className="form-input sm:max-w-xs"
+          <div className="mt-5 grid gap-4 rounded-lg border border-slate-200 bg-slate-50 p-4 md:grid-cols-[220px_1fr] dark:border-slate-700 dark:bg-slate-900">
+            <label className="space-y-1.5">
+              <span className="form-label">Attendance Site</span>
+              <select
+                className="form-input"
                 disabled={loadingAction || Boolean(today?.checkIn) || isTodayWeekOff}
-                type="file"
-                onChange={(event) => setAttendancePhotoFile(event.target.files?.[0] || null)}
-              />
+                value={attendanceSite}
+                onChange={(event) => setAttendanceSite(event.target.value)}
+              >
+                <option value="">Select site</option>
+                {ATTENDANCE_SITES.map((site) => <option key={site} value={site}>{site}</option>)}
+              </select>
             </label>
-            {attendancePhotoFile ? (
-              <p className="mt-2 text-xs font-semibold text-slate-500 dark:text-slate-300">{attendancePhotoFile.name}</p>
-            ) : null}
+            <div>
+              <p className="form-label">Attendance Photo</p>
+              <p className="mb-2 mt-1 text-xs font-semibold text-slate-500 dark:text-slate-300">
+                Required for check-in. The saved image includes site, date, time, and device watermark.
+              </p>
+              <AttendanceCamera
+                disabled={loadingAction || Boolean(today?.checkIn) || isTodayWeekOff}
+                photo={attendancePhoto}
+                onChange={setAttendancePhoto}
+              />
+            </div>
           </div>
           <div className="mt-5 grid gap-3 md:grid-cols-3">
             <div className="surface-muted p-4">
@@ -301,6 +323,7 @@ export default function AttendancePage() {
                 <th className="px-4 py-3">Check In</th>
                 <th className="px-4 py-3">Check Out</th>
                 <th className="px-4 py-3">Shift</th>
+                <th className="px-4 py-3">Site</th>
                 <th className="px-4 py-3">Check-In Location</th>
                 <th className="px-4 py-3">Photo</th>
                 <th className="px-4 py-3">Check-Out Location</th>
@@ -329,6 +352,7 @@ export default function AttendancePage() {
                   <td className="table-cell">{formatDateTime(record.checkIn)}</td>
                   <td className="table-cell">{formatDateTime(record.checkOut)}</td>
                   <td className="table-cell font-semibold">{attendanceShift(record)}</td>
+                  <td className="table-cell font-semibold">{record.attendanceSite || "-"}</td>
                   <td className="table-cell">
                     <p className="font-semibold">{record.checkInLocationStatus || "Location not available"}</p>
                     <p className="text-xs text-slate-500">{record.checkInLatitude ?? "-"}, {record.checkInLongitude ?? "-"}</p>
@@ -419,6 +443,10 @@ export default function AttendancePage() {
                     <p className="mt-1 font-semibold text-slate-950">{attendanceShift(record)}</p>
                   </div>
                 ) : null}
+                <div>
+                  <p className="text-xs font-black uppercase text-slate-500">Site</p>
+                  <p className="mt-1 font-semibold text-slate-950">{record.attendanceSite || "-"}</p>
+                </div>
                 <div>
                   <p className="text-xs font-black uppercase text-slate-500">Check-In Location</p>
                   <p className="mt-1 font-semibold text-slate-950">{record.checkInLocationStatus || "Location not available"}</p>

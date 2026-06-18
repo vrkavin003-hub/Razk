@@ -4,7 +4,7 @@ import Button from "./Button";
 import FileUploadField from "./FileUploadField";
 import UserAvatar from "./UserAvatar";
 
-const departments = ["Production", "Quality", "Maintenance", "Stores", "Administration", "HR", "Finance"];
+const departments = ["Production", "Quality", "Maintenance", "Stores", "Administration", "HR", "Finance", "IT"];
 const roles = ["employee", "hr", "admin", "dri"];
 const shifts = ["", "1st Shift", "2nd Shift", "3rd Shift", "General Shift"];
 const weekDays = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];

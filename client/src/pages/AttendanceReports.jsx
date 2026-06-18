@@ -326,6 +326,7 @@ function ReportTable({ report }) {
               <th className="px-4 py-3">Check-in</th>
               <th className="px-4 py-3">Check-out</th>
               <th className="px-4 py-3">Shift</th>
+              <th className="px-4 py-3">Site</th>
               <th className="px-4 py-3">Check-in Location</th>
               <th className="px-4 py-3">Check-out Location</th>
               <th className="px-4 py-3">Hours</th>
@@ -341,6 +342,7 @@ function ReportTable({ report }) {
                 <td className="table-cell">{formatTime(record.checkIn)}</td>
                 <td className="table-cell">{formatTime(record.checkOut)}</td>
                 <td className="table-cell font-semibold">{attendanceShift(record)}</td>
+                <td className="table-cell font-semibold">{record.attendanceSite || "-"}</td>
                 <td className="table-cell">
                   <p className="font-semibold">{record.checkInLocationStatus || "Location not available"}</p>
                   <p className="text-xs text-slate-500">

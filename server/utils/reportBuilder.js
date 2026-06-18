@@ -106,6 +106,7 @@ const buildDailyRecords = ({ employee, attendance, leaves, from, to }) =>
         attendanceRecord?.shiftName ||
         getShiftFromCheckIn(attendanceRecord?.checkIn || attendanceRecord?.checkInTime, employee?.assignedShift),
       workingHours: Number(attendanceRecord?.workingHours || 0),
+      attendanceSite: attendanceRecord?.attendanceSite || "",
       checkInLocationStatus: attendanceRecord?.checkInLocationStatus || "Unknown",
       checkInLatitude: attendanceRecord?.checkInLatitude ?? "",
       checkInLongitude: attendanceRecord?.checkInLongitude ?? "",
@@ -338,43 +339,65 @@ const drawSummary = (doc, summary, y) =>
     y
   );
 
-const ensurePageSpace = (doc, y, needed = 70) => {
-  if (y + needed < 730) return y;
-  doc.addPage();
-  drawHeader(doc, { title: "Attendance Report", generatedAt: new Date(), generatedBy: {} });
-  return 124;
-};
-
-const drawTable = (doc, columns, rows, y) => {
+const drawTable = (doc, columns, rows, y, report) => {
   const widths = columns.map((column) => column.width);
   const totalWidth = widths.reduce((sum, width) => sum + width, 0);
-  let cursorY = ensurePageSpace(doc, y, 40);
-  let cursorX = 48;
+  const drawColumnHeaders = (startY) => {
+    doc.font("Helvetica-Bold").fontSize(7);
+    const headerHeight = Math.max(
+      20,
+      ...columns.map((column, index) =>
+        doc.heightOfString(column.label, { width: widths[index] - 8 }) + 10
+      )
+    );
+    let cursorX = 48;
+    doc.rect(48, startY, totalWidth, headerHeight).fill("#eff6ff");
+    columns.forEach((column, index) => {
+      doc
+        .font("Helvetica-Bold")
+        .fontSize(7)
+        .fillColor("#1e40af")
+        .text(column.label, cursorX + 4, startY + 5, { width: widths[index] - 8 });
+      cursorX += widths[index];
+    });
+    return startY + headerHeight;
+  };
 
-  doc.rect(48, cursorY, totalWidth, 20).fill("#eff6ff");
-  columns.forEach((column, index) => {
-    doc
-      .font("Helvetica-Bold")
-      .fontSize(7)
-      .fillColor("#1e40af")
-      .text(column.label, cursorX + 4, cursorY + 6, { width: widths[index] - 8 });
-    cursorX += widths[index];
-  });
-  cursorY += 20;
+  let cursorY = y;
+  if (cursorY + 40 >= 730) {
+    doc.addPage();
+    drawHeader(doc, report);
+    cursorY = 124;
+  }
+  cursorY = drawColumnHeaders(cursorY);
 
   rows.forEach((row, rowIndex) => {
-    cursorY = ensurePageSpace(doc, cursorY, 22);
-    cursorX = 48;
-    if (rowIndex % 2 === 0) doc.rect(48, cursorY, totalWidth, 20).fill("#f8fafc");
+    doc.font("Helvetica").fontSize(7);
+    const values = columns.map((column) => String(row[column.key] ?? "-"));
+    const rowHeight = Math.max(
+      20,
+      ...values.map((value, index) =>
+        doc.heightOfString(value, { width: widths[index] - 8 }) + 10
+      )
+    );
+
+    if (cursorY + rowHeight >= 730) {
+      doc.addPage();
+      drawHeader(doc, report);
+      cursorY = drawColumnHeaders(124);
+    }
+
+    let cursorX = 48;
+    if (rowIndex % 2 === 0) doc.rect(48, cursorY, totalWidth, rowHeight).fill("#f8fafc");
     columns.forEach((column, index) => {
       doc
         .font("Helvetica")
         .fontSize(7)
         .fillColor("#0f172a")
-        .text(String(row[column.key] ?? "-"), cursorX + 4, cursorY + 6, { width: widths[index] - 8 });
+        .text(values[index], cursorX + 4, cursorY + 5, { width: widths[index] - 8 });
       cursorX += widths[index];
     });
-    cursorY += 20;
+    cursorY += rowHeight;
   });
 
   return cursorY + 16;
@@ -420,26 +443,29 @@ const renderEmployeePdf = (doc, report) => {
   drawTable(
     doc,
     [
-      { key: "date", label: "Date", width: 64 },
-      { key: "day", label: "Day", width: 30 },
-      { key: "checkInText", label: "Check-in", width: 54 },
-      { key: "checkOutText", label: "Check-out", width: 54 },
-      { key: "shiftName", label: "Shift", width: 60 },
-      { key: "workingHours", label: "Hrs", width: 30 },
-      { key: "status", label: "Status", width: 48 },
-      { key: "checkInGps", label: "In GPS", width: 58 },
-      { key: "checkOutGps", label: "Out GPS", width: 58 },
-      { key: "remarks", label: "Remarks", width: 36 }
+      { key: "date", label: "Date", width: 56 },
+      { key: "day", label: "Day", width: 26 },
+      { key: "checkInText", label: "Check-in", width: 48 },
+      { key: "checkOutText", label: "Check-out", width: 48 },
+      { key: "shiftName", label: "Shift", width: 48 },
+      { key: "attendanceSite", label: "Site", width: 42 },
+      { key: "workingHours", label: "Hrs", width: 26 },
+      { key: "status", label: "Status", width: 42 },
+      { key: "checkInGps", label: "In GPS", width: 46 },
+      { key: "checkOutGps", label: "Out GPS", width: 46 },
+      { key: "remarks", label: "Remarks", width: 72 }
     ],
     report.records.map((record) => ({
       ...record,
       date: formatDate(record.date),
+      attendanceSite: record.attendanceSite || "-",
       checkInText: formatTime(record.checkIn),
       checkOutText: formatTime(record.checkOut),
       checkInGps: record.checkInLatitude !== "" ? `${record.checkInLatitude}, ${record.checkInLongitude}` : record.checkInLocationStatus,
       checkOutGps: record.checkOutLatitude !== "" ? `${record.checkOutLatitude}, ${record.checkOutLongitude}` : record.checkOutLocationStatus
     })),
-    y
+    y,
+    report
   );
   drawSignatures(doc);
 };
@@ -456,24 +482,25 @@ const renderSummaryPdf = (doc, report) => {
       ["Department", report.department || "All"],
       ["Employees", report.rows.length]
     ],
-    y
+    y,
+    report
   );
   drawTable(
     doc,
     [
-      { key: "serial", label: "S.No", width: 28 },
-      { key: "employeeId", label: "Employee ID", width: 62 },
-      { key: "name", label: "Employee Name", width: 92 },
-      { key: "department", label: "Department", width: 70 },
-      { key: "designation", label: "Designation", width: 70 },
-      { key: "present", label: "P", width: 30 },
-      { key: "absent", label: "A", width: 30 },
-      { key: "late", label: "L", width: 30 },
-      { key: "halfDay", label: "HD", width: 32 },
-      { key: "leave", label: "LV", width: 30 },
-      { key: "weekOff", label: "WO", width: 32 },
-      { key: "totalWorkingHours", label: "Hours", width: 38 },
-      { key: "attendancePercentage", label: "%", width: 32 }
+      { key: "serial", label: "S.No", width: 24 },
+      { key: "employeeId", label: "Employee ID", width: 56 },
+      { key: "name", label: "Employee Name", width: 90 },
+      { key: "department", label: "Department", width: 65 },
+      { key: "designation", label: "Designation", width: 65 },
+      { key: "present", label: "P", width: 22 },
+      { key: "absent", label: "A", width: 22 },
+      { key: "late", label: "L", width: 22 },
+      { key: "halfDay", label: "HD", width: 24 },
+      { key: "leave", label: "LV", width: 24 },
+      { key: "weekOff", label: "WO", width: 24 },
+      { key: "totalWorkingHours", label: "Hours", width: 32 },
+      { key: "attendancePercentage", label: "%", width: 30 }
     ],
     report.rows.map((row, index) => ({
       serial: index + 1,

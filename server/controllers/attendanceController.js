@@ -7,6 +7,8 @@ const { getWorkingHours, isLateCheckIn, toDateKey } = require("../utils/dates");
 const { normalizeAttendanceLocation } = require("../utils/geo");
 const { getShiftFromCheckIn } = require("../utils/shifts");
 const { isAssignedWeekOffDate, weekRangeForDateKey } = require("../utils/weekOff");
+const { normalizeAttendanceSite } = require("../utils/attendanceSites");
+const { normalizeDeviceName } = require("../utils/deviceApproval");
 
 const employeeSelect = "name email employeeId department designation assignedShift weeklyWeekOffDay profilePhoto";
 const hrWeekOffSourceStatuses = ["Absent", "Leave", "Missed"];
@@ -44,6 +46,29 @@ const checkIn = asyncHandler(async (req, res) => {
 
   const now = new Date();
   const location = normalizeAttendanceLocation(req.body, now);
+  const attendanceSite = normalizeAttendanceSite(req.body.attendanceSite);
+  if (!attendanceSite) {
+    res.status(400);
+    throw new Error("Select a valid attendance site: Chennai or Hosur");
+  }
+  const attendancePhoto = String(req.body.attendancePhoto || "").trim();
+  if (!attendancePhoto) {
+    res.status(400);
+    throw new Error("Attendance photo is required for check-in");
+  }
+  if (!/^\/uploads\/images\/[^/?#]+$/.test(attendancePhoto)) {
+    res.status(400);
+    throw new Error("Attendance photo must be uploaded before check-in");
+  }
+  const requestedCaptureTime = new Date(req.body.attendancePhotoCapturedAt || now);
+  if (
+    Number.isNaN(requestedCaptureTime.getTime()) ||
+    requestedCaptureTime.getTime() > now.getTime() + 5 * 60 * 1000 ||
+    requestedCaptureTime.getTime() < now.getTime() - 24 * 60 * 60 * 1000
+  ) {
+    res.status(400);
+    throw new Error("Attendance photo capture time is invalid");
+  }
   const shiftName = getShiftFromCheckIn(now, req.user.assignedShift);
   const attendance = await Attendance.create({
     employee: req.user._id,
@@ -57,6 +82,10 @@ const checkIn = asyncHandler(async (req, res) => {
     checkInLocationStatus: location.locationStatus,
     checkInLocationCapturedAt: location.capturedAt,
     checkInDistanceMeters: null,
+    attendanceSite,
+    checkInPhoto: attendancePhoto,
+    checkInPhotoDevice: normalizeDeviceName(req.body.attendancePhotoDevice),
+    checkInPhotoCapturedAt: requestedCaptureTime,
     status: isLateCheckIn(now) ? "Late" : "Present",
     locationNote: req.body.locationNote,
     remarks: req.body.remarks
@@ -185,6 +214,7 @@ const exportCsv = asyncHandler(async (req, res) => {
       "Check In",
       "Check Out",
       "Shift",
+      "Site",
       "Working Hours",
       "Status",
       "Check-in Latitude",
@@ -206,6 +236,7 @@ const exportCsv = asyncHandler(async (req, res) => {
       item.checkIn ? item.checkIn.toISOString() : "",
       item.checkOut ? item.checkOut.toISOString() : "",
       item.shiftName || getShiftFromCheckIn(item.checkIn, item.employee?.assignedShift),
+      item.attendanceSite || "-",
       item.workingHours,
       item.status,
       item.checkInLatitude ?? "",

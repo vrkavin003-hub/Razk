@@ -63,6 +63,9 @@ export const AuthProvider = ({ children }) => {
       password: credentials.password
     };
     const { data } = await api.post("/auth/login", payload);
+    if (data.requiresDeviceApproval || !data.token || !data.user) {
+      throw new Error(data.message || "Device approval is required before login");
+    }
     clearAuthStorage();
     setSessionValue(TOKEN_KEY, data.token);
     setSessionValue(USER_KEY, JSON.stringify(data.user));

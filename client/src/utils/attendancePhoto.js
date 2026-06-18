@@ -17,7 +17,7 @@ const loadImage = (file) =>
     image.src = url;
   });
 
-export const createWatermarkedAttendancePhoto = async (file) => {
+export const createWatermarkedAttendancePhoto = async (file, { capturedAt = new Date(), site = "" } = {}) => {
   if (!file) return null;
   if (!file.type?.startsWith("image/")) {
     throw new Error("Attendance photo must be an image");
@@ -30,19 +30,38 @@ export const createWatermarkedAttendancePhoto = async (file) => {
   const scale = Math.min(1, MAX_DIMENSION / Math.max(image.width, image.height));
   const width = Math.round(image.width * scale);
   const height = Math.round(image.height * scale);
+  if (!width || !height) {
+    throw new Error("Attendance photo has invalid dimensions");
+  }
   const canvas = document.createElement("canvas");
   canvas.width = width;
   canvas.height = height;
   const context = canvas.getContext("2d");
+  if (!context) {
+    throw new Error("Unable to prepare attendance photo");
+  }
 
   context.drawImage(image, 0, 0, width, height);
 
   const { deviceName } = getDeviceInfo();
-  const timestamp = new Date().toLocaleString("en-IN", {
-    dateStyle: "medium",
-    timeStyle: "short"
+  const requestedCaptureDate = new Date(capturedAt);
+  const captureDate = Number.isNaN(requestedCaptureDate.getTime()) ? new Date() : requestedCaptureDate;
+  const dateText = captureDate.toLocaleDateString("en-IN", {
+    day: "2-digit",
+    month: "short",
+    year: "numeric"
   });
-  const lines = ["Attendance Photo", `Time: ${timestamp}`, `Device: ${deviceName}`];
+  const timeText = captureDate.toLocaleTimeString("en-IN", {
+    hour: "2-digit",
+    minute: "2-digit"
+  });
+  const lines = [
+    "Razk Automation Attendance",
+    `Site: ${site || "-"}`,
+    `Date: ${dateText}`,
+    `Time: ${timeText}`,
+    `Device: ${deviceName}`
+  ];
   const fontSize = Math.max(14, Math.round(width * 0.026));
   const padding = Math.max(14, Math.round(width * 0.025));
   const lineHeight = Math.round(fontSize * 1.35);
@@ -53,7 +72,7 @@ export const createWatermarkedAttendancePhoto = async (file) => {
   context.font = `700 ${fontSize}px Arial, sans-serif`;
   context.fillStyle = "#ffffff";
   lines.forEach((line, index) => {
-    context.fillText(line, padding, height - boxHeight + padding / 1.4 + lineHeight * (index + 0.7));
+    context.fillText(line, padding, height - boxHeight + padding / 1.4 + lineHeight * (index + 0.7), width - padding * 2);
   });
 
   return new Promise((resolve, reject) => {
