@@ -59,6 +59,9 @@ const getStartupConfig = () => {
 
 const getEnvironmentStatus = () => ({
   CLIENT_ORIGIN: Boolean(process.env.CLIENT_ORIGIN || process.env.CLIENT_URL),
+  CLOUDINARY_API_KEY: Boolean(process.env.CLOUDINARY_API_KEY),
+  CLOUDINARY_API_SECRET: Boolean(process.env.CLOUDINARY_API_SECRET),
+  CLOUDINARY_CLOUD_NAME: Boolean(process.env.CLOUDINARY_CLOUD_NAME),
   DATABASE_URL: Boolean(process.env.DATABASE_URL),
   JWT_REFRESH_SECRET: Boolean(process.env.JWT_REFRESH_SECRET),
   JWT_SECRET: Boolean(process.env.JWT_SECRET),
@@ -73,6 +76,7 @@ const getEnvironmentStatus = () => ({
   SQLSERVER_PORT: Boolean(process.env.SQLSERVER_PORT),
   SQLSERVER_TRUST_SERVER_CERTIFICATE: Boolean(process.env.SQLSERVER_TRUST_SERVER_CERTIFICATE),
   SQLSERVER_USER: Boolean(process.env.SQLSERVER_USER),
+  SENTRY_DSN: Boolean(process.env.SENTRY_DSN),
   PORT: Boolean(process.env.PORT)
 });
 
@@ -80,6 +84,10 @@ const validateStartupConfiguration = (startupConfig) => {
   const missing = [];
 
   if (!process.env.PORT) missing.push("PORT");
+  if (startupConfig.isProduction && !process.env.JWT_SECRET) missing.push("JWT_SECRET");
+  if (startupConfig.isProduction && !process.env.CLIENT_ORIGIN && !process.env.CLIENT_URL) {
+    missing.push("CLIENT_ORIGIN");
+  }
 
   if (startupConfig.databaseMode === "sqlserver") {
     if (
@@ -97,8 +105,16 @@ const validateStartupConfiguration = (startupConfig) => {
     missing.push("MONGO_URI");
   }
 
-  if (startupConfig.isProduction && startupConfig.allowLocalStore) {
+  if (
+    startupConfig.isProduction &&
+    String(process.env.ALLOW_LOCAL_STORE || "").trim().toLowerCase() !== "false"
+  ) {
     missing.push("ALLOW_LOCAL_STORE");
+  }
+  if (startupConfig.isProduction) {
+    if (!process.env.CLOUDINARY_CLOUD_NAME) missing.push("CLOUDINARY_CLOUD_NAME");
+    if (!process.env.CLOUDINARY_API_KEY) missing.push("CLOUDINARY_API_KEY");
+    if (!process.env.CLOUDINARY_API_SECRET) missing.push("CLOUDINARY_API_SECRET");
   }
 
   if (missing.length) {

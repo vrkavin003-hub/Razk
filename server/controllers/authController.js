@@ -1,16 +1,16 @@
 const crypto = require("crypto");
-const jwt = require("jsonwebtoken");
-const { getJwtSecret } = require("../config/authSecret");
 const asyncHandler = require("../utils/asyncHandler");
+const { generateToken } = require("../utils/authToken");
 const { normalizeDeviceId, normalizeDeviceName } = require("../utils/deviceApproval");
+const { logInfo, logWarn } = require("../utils/structuredLogger");
 const User = require("../models/User");
 
-const generateToken = (id) =>
-  jwt.sign({ id }, getJwtSecret(), {
-    expiresIn: "7d"
-  });
-
 const escapeRegex = (value = "") => String(value).replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+const loginSubject = (value) =>
+  crypto.createHash("sha256").update(String(value || "").trim().toLowerCase()).digest("hex").slice(0, 16);
+const bumpTokenVersion = (user) => {
+  user.tokenVersion = Number(user.tokenVersion || 0) + 1;
+};
 
 const sanitizeUser = (user) => ({
   _id: user._id,
@@ -49,7 +49,7 @@ const register = asyncHandler(async (req, res) => {
 
   res.status(201).json({
     user: sanitizeUser(user),
-    token: generateToken(user._id)
+    token: user.role === "employee" ? undefined : generateToken(user)
   });
 });
 
@@ -71,22 +71,29 @@ const login = asyncHandler(async (req, res) => {
   }).select("+password");
 
   if (!user || !user.isActive || !(await user.matchPassword(password))) {
+    logWarn("login_failed", {
+      loginSubject: loginSubject(loginId),
+      reason: "invalid_credentials"
+    });
     res.status(401);
     throw new Error("Invalid email or password");
   }
 
   if (user.role === "employee") {
     if (!user.employeeId) {
+      logWarn("login_failed", { reason: "missing_employee_id", userId: String(user._id) });
       res.status(403);
       throw new Error("Employee ID is not configured for this account. Please contact HR.");
     }
     if (loginId.toLowerCase() !== String(user.employeeId).toLowerCase()) {
+      logWarn("login_failed", { reason: "employee_email_login_blocked", userId: String(user._id) });
       res.status(400);
       throw new Error("Employees must login using their Employee ID");
     }
     const normalizedDeviceId = normalizeDeviceId(deviceId);
     const normalizedDeviceName = normalizeDeviceName(deviceName);
     if (!normalizedDeviceId) {
+      logWarn("login_failed", { reason: "missing_device_id", userId: String(user._id) });
       res.status(400);
       throw new Error("A valid device ID is required for employee login");
     }
@@ -95,13 +102,16 @@ const login = asyncHandler(async (req, res) => {
       if (user.deviceApprovalStatus !== "approved") {
         user.deviceApprovalStatus = "approved";
         user.deviceApprovedAt = user.deviceApprovedAt || user.deviceRegisteredAt || new Date();
+        bumpTokenVersion(user);
         await user.save();
       }
     } else if (user.registeredDeviceId) {
+      logWarn("login_failed", { reason: "different_device", userId: String(user._id) });
       res.status(403);
       throw new Error("This employee account is registered to another device. Please contact HR.");
     } else {
       if (user.deviceApprovalStatus === "rejected") {
+        logWarn("login_failed", { reason: "device_rejected", userId: String(user._id) });
         res.status(403);
         throw new Error("Your device approval request was rejected by HR. Please contact HR.");
       }
@@ -123,6 +133,7 @@ const login = asyncHandler(async (req, res) => {
       user.deviceRejectedAt = undefined;
       user.deviceRejectedBy = undefined;
       await user.save();
+      logInfo("device_approval_requested", { userId: String(user._id) });
       res.status(202).json({
         requiresDeviceApproval: true,
         message: "Your device approval request has been sent to HR. You can login after HR approves this device."
@@ -131,9 +142,10 @@ const login = asyncHandler(async (req, res) => {
     }
   }
 
+  logInfo("login_succeeded", { role: user.role, userId: String(user._id) });
   res.json({
     user: sanitizeUser(user),
-    token: generateToken(user._id)
+    token: generateToken(user, user.role === "employee" ? String(deviceId).trim() : "")
   });
 });
 
@@ -179,6 +191,7 @@ const resetPassword = asyncHandler(async (req, res) => {
   }
 
   user.password = password;
+  bumpTokenVersion(user);
   user.resetPasswordToken = undefined;
   user.resetPasswordExpires = undefined;
   await user.save();
@@ -210,6 +223,7 @@ const changePassword = asyncHandler(async (req, res) => {
   }
 
   user.password = newPassword;
+  bumpTokenVersion(user);
   await user.save();
 
   res.json({ message: "Password changed successfully" });

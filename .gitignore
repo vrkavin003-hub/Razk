@@ -16,3 +16,9 @@ server/uploads/resumes/*
 npm-debug.log*
 .DS_Store
 .chrome-hya/
+tests/load/*.local.json
+tests/load/*.local.*
+tests/load/results/
+tmp/
+*.jks
+*.keystore

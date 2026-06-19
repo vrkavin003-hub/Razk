@@ -96,6 +96,11 @@ const userSchema = new mongoose.Schema(
       type: mongoose.Schema.Types.ObjectId,
       ref: "User"
     },
+    tokenVersion: {
+      type: Number,
+      default: 0,
+      min: 0
+    },
     isActive: {
       type: Boolean,
       default: true
@@ -105,6 +110,8 @@ const userSchema = new mongoose.Schema(
   },
   { timestamps: true }
 );
+
+userSchema.index({ deviceApprovalStatus: 1, deviceRequestedAt: 1 });
 
 userSchema.pre("save", async function hashPassword(next) {
   if (!this.isModified("password")) return next();

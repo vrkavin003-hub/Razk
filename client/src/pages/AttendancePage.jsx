@@ -3,19 +3,17 @@ import { useEffect, useState } from "react";
 import toast from "react-hot-toast";
 import Button from "../components/Button";
 import AttendanceCamera from "../components/AttendanceCamera";
+import AttendancePhotoLink from "../components/AttendancePhotoLink";
 import DateTimeDisplay from "../components/DateTimeDisplay";
 import EmptyState from "../components/EmptyState";
 import Loading from "../components/Loading";
 import PageHeader from "../components/PageHeader";
 import StatusBadge from "../components/StatusBadge";
 import UserAvatar from "../components/UserAvatar";
-import { mediaUrl } from "../config/api";
 import { useAuth } from "../context/AuthContext";
 import api from "../services/api";
-import { uploadFile } from "../services/upload";
-import { createWatermarkedAttendancePhoto } from "../utils/attendancePhoto";
+import { submitAttendance } from "../services/attendance";
 import { ATTENDANCE_SITES } from "../utils/attendanceSites";
-import { getDeviceInfo } from "../utils/device";
 import { formatDate, formatDateTime } from "../utils/formatters";
 import { getAttendanceLocationPayload, googleMapsUrl } from "../utils/geolocation";
 import { roleMatches } from "../utils/formatters";
@@ -27,7 +25,7 @@ const weekOffEditableStatuses = ["Absent", "Leave", "Missed"];
 export default function AttendancePage() {
   const { user } = useAuth();
   const isManager = roleMatches(user?.role, ["admin", "hr"]);
-  const canMarkAttendance = roleMatches(user?.role, ["employee", "hr", "dri"]);
+  const canMarkAttendance = roleMatches(user?.role, ["employee", "hr", "admin", "dri"]);
   const [records, setRecords] = useState(null);
   const [today, setToday] = useState(null);
   const [filters, setFilters] = useState({ date: "", department: "", employeeId: "" });
@@ -97,31 +95,23 @@ export default function AttendancePage() {
     setLoadingAction(true);
     try {
       const location = await refreshLocation(false);
-      const payload = {
-        employee_id: user?.employeeId,
-        accuracy: location.accuracy,
-        latitude: location.latitude,
-        locationStatus: location.locationStatus,
-        longitude: location.longitude
-      };
-      if (isCheckIn) {
-        const watermarkedPhoto = await createWatermarkedAttendancePhoto(attendancePhoto.file, {
-          capturedAt: attendancePhoto.capturedAt,
-          site: attendanceSite
-        });
-        const uploaded = await uploadFile(watermarkedPhoto, "image");
-        payload.attendancePhoto = uploaded.url;
-        payload.attendancePhotoDevice = getDeviceInfo().deviceName;
-        payload.attendancePhotoCapturedAt = new Date(attendancePhoto.capturedAt).toISOString();
-        payload.attendanceSite = attendanceSite;
-      }
-      await api.post(path, payload);
+      await submitAttendance({
+        attendancePhoto,
+        attendanceSite,
+        employeeId: user?.employeeId,
+        location,
+        path
+      });
       if (isCheckIn) {
         setAttendancePhoto(null);
         setAttendanceSite("");
       }
       toast.success(location.locationStatus === "Captured" ? message : location.locationStatus === "Permission denied" ? "Attendance marked, but location permission was not allowed." : locationUnavailableMessage);
-      await load();
+      try {
+        await load();
+      } catch {
+        toast.error("Attendance was saved, but the page could not refresh. Use Refresh to try again.");
+      }
     } catch (error) {
       toast.error(error.message);
     } finally {
@@ -206,7 +196,7 @@ export default function AttendancePage() {
               <span className="form-label">Attendance Site</span>
               <select
                 className="form-input"
-                disabled={loadingAction || Boolean(today?.checkIn) || isTodayWeekOff}
+                disabled={loadingAction || Boolean(today?.checkIn) || isTodayWeekOff || Boolean(attendancePhoto?.file)}
                 value={attendanceSite}
                 onChange={(event) => setAttendanceSite(event.target.value)}
               >
@@ -220,9 +210,11 @@ export default function AttendancePage() {
                 Required for check-in. The saved image includes site, date, time, and device watermark.
               </p>
               <AttendanceCamera
-                disabled={loadingAction || Boolean(today?.checkIn) || isTodayWeekOff}
+                disabled={loadingAction || Boolean(today?.checkIn) || isTodayWeekOff || !attendanceSite}
+                location={locationState.coordinates || { locationStatus: locationState.status }}
                 photo={attendancePhoto}
                 onChange={setAttendancePhoto}
+                site={attendanceSite}
               />
             </div>
           </div>
@@ -365,9 +357,7 @@ export default function AttendancePage() {
                   </td>
                   <td className="table-cell">
                     {record.checkInPhoto ? (
-                      <a className="inline-flex items-center gap-1 text-xs font-bold text-slate-900" href={mediaUrl(record.checkInPhoto)} target="_blank" rel="noreferrer">
-                        View Photo <ExternalLink className="h-3 w-3" aria-hidden="true" />
-                      </a>
+                      <AttendancePhotoLink attendanceId={record._id} />
                     ) : (
                       "-"
                     )}
@@ -460,9 +450,7 @@ export default function AttendancePage() {
                 <div>
                   <p className="text-xs font-black uppercase text-slate-500">Photo</p>
                   {record.checkInPhoto ? (
-                    <a className="mt-1 inline-flex items-center gap-1 text-xs font-bold text-slate-900" href={mediaUrl(record.checkInPhoto)} target="_blank" rel="noreferrer">
-                      View Photo <ExternalLink className="h-3 w-3" aria-hidden="true" />
-                    </a>
+                    <AttendancePhotoLink attendanceId={record._id} className="mt-1" />
                   ) : (
                     <p className="mt-1 text-sm font-semibold text-slate-950">-</p>
                   )}

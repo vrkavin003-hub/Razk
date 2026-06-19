@@ -1,5 +1,7 @@
 import { Camera, CameraOff, RefreshCcw, X } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
+import { attendanceWatermarkLines } from "../utils/attendancePhoto";
+import { getDeviceInfo } from "../utils/device";
 import Button from "./Button";
 
 const canvasFile = (canvas) =>
@@ -17,16 +19,24 @@ const canvasFile = (canvas) =>
     );
   });
 
-export default function AttendanceCamera({ disabled = false, onChange, photo }) {
+export default function AttendanceCamera({
+  disabled = false,
+  location,
+  onChange,
+  photo,
+  site = ""
+}) {
   const videoRef = useRef(null);
   const streamRef = useRef(null);
   const fallbackInputRef = useRef(null);
   const mountedRef = useRef(false);
   const requestRef = useRef(0);
+  const liveTimestampRef = useRef(new Date());
   const [open, setOpen] = useState(false);
   const [cameraError, setCameraError] = useState("");
   const [starting, setStarting] = useState(false);
   const [capturing, setCapturing] = useState(false);
+  const [liveTimestamp, setLiveTimestamp] = useState(liveTimestampRef.current);
 
   const stopCamera = () => {
     streamRef.current?.getTracks().forEach((track) => track.stop());
@@ -47,10 +57,11 @@ export default function AttendanceCamera({ disabled = false, onChange, photo }) 
     requestRef.current = requestId;
     setCameraError("");
     setStarting(true);
+    liveTimestampRef.current = new Date();
+    setLiveTimestamp(liveTimestampRef.current);
     if (!navigator.mediaDevices?.getUserMedia) {
       setCameraError("Direct camera access is not supported. Use the device camera fallback.");
       setStarting(false);
-      fallbackInputRef.current?.click();
       return;
     }
 
@@ -58,7 +69,7 @@ export default function AttendanceCamera({ disabled = false, onChange, photo }) 
       setOpen(true);
       const stream = await navigator.mediaDevices.getUserMedia({
         audio: false,
-        video: { facingMode: { ideal: "environment" } }
+        video: { facingMode: { ideal: "user" } }
       });
       if (!mountedRef.current || requestRef.current !== requestId) {
         stream.getTracks().forEach((track) => track.stop());
@@ -91,7 +102,11 @@ export default function AttendanceCamera({ disabled = false, onChange, photo }) 
       context.drawImage(video, 0, 0, canvas.width, canvas.height);
       const file = await canvasFile(canvas);
       if (mountedRef.current) {
-        onChange({ capturedAt: new Date(), file });
+        onChange({
+          capturedAt: new Date(liveTimestampRef.current),
+          file,
+          location
+        });
         closeCamera();
       }
     } catch (error) {
@@ -104,11 +119,11 @@ export default function AttendanceCamera({ disabled = false, onChange, photo }) 
     const file = event.target.files?.[0];
     if (file && !file.type?.startsWith("image/")) {
       setCameraError("Attendance photo must be an image.");
-    } else if (file && file.size > 8 * 1024 * 1024) {
-      setCameraError("Attendance photo must be below 8 MB.");
+    } else if (file && file.size > 5 * 1024 * 1024) {
+      setCameraError("Attendance photo must be below 5 MB.");
     } else if (file) {
       setCameraError("");
-      onChange({ capturedAt: new Date(), file });
+      onChange({ capturedAt: new Date(), file, location });
     }
     event.target.value = "";
   };
@@ -126,13 +141,28 @@ export default function AttendanceCamera({ disabled = false, onChange, photo }) 
       videoRef.current.srcObject = streamRef.current;
     }
   }, [open, starting]);
+  useEffect(() => {
+    if (!open) return undefined;
+    const timer = window.setInterval(() => {
+      liveTimestampRef.current = new Date();
+      setLiveTimestamp(liveTimestampRef.current);
+    }, 1000);
+    return () => window.clearInterval(timer);
+  }, [open]);
+
+  const watermarkLines = attendanceWatermarkLines({
+    capturedAt: liveTimestamp,
+    deviceName: getDeviceInfo().deviceName,
+    location,
+    site
+  });
 
   return (
     <>
       <input
         ref={fallbackInputRef}
         accept="image/*"
-        capture="environment"
+        capture="user"
         className="hidden"
         disabled={disabled}
         type="file"
@@ -169,7 +199,18 @@ export default function AttendanceCamera({ disabled = false, onChange, photo }) 
                 Waiting for camera permission...
               </div>
             ) : (
-              <video ref={videoRef} autoPlay muted playsInline className="max-h-[65vh] w-full rounded-lg bg-black object-contain" />
+              <div className="relative overflow-hidden rounded-lg bg-black">
+                <video
+                  ref={videoRef}
+                  autoPlay
+                  muted
+                  playsInline
+                  className="max-h-[65vh] w-full scale-x-[-1] object-contain"
+                />
+                <div className="pointer-events-none absolute inset-x-0 bottom-0 bg-black/70 px-3 py-2 text-left text-[11px] font-bold leading-4 text-white sm:px-4 sm:py-3 sm:text-xs sm:leading-5">
+                  {watermarkLines.map((line) => <p key={line}>{line}</p>)}
+                </div>
+              </div>
             )}
             <div className="mt-4 flex justify-end gap-2">
               <Button disabled={capturing} onClick={closeCamera} variant="secondary">Cancel</Button>

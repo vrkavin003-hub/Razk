@@ -6,19 +6,19 @@ const normalizeWeekOffDay = (value) => {
 };
 
 const dayNameForDateKey = (dateKey) => {
-  const date = new Date(`${dateKey}T00:00:00`);
-  return WEEK_DAYS[date.getDay()];
+  const date = new Date(`${dateKey}T00:00:00Z`);
+  return WEEK_DAYS[date.getUTCDay()];
 };
 
 const isAssignedWeekOffDate = (employee, dateKey) =>
   dayNameForDateKey(dateKey) === normalizeWeekOffDay(employee?.weeklyWeekOffDay);
 
 const weekRangeForDateKey = (dateKey) => {
-  const date = new Date(`${dateKey}T00:00:00`);
+  const date = new Date(`${dateKey}T00:00:00Z`);
   const start = new Date(date);
-  start.setDate(date.getDate() - date.getDay());
+  start.setUTCDate(date.getUTCDate() - date.getUTCDay());
   const end = new Date(start);
-  end.setDate(start.getDate() + 6);
+  end.setUTCDate(start.getUTCDate() + 6);
   return {
     start: start.toISOString().slice(0, 10),
     end: end.toISOString().slice(0, 10)

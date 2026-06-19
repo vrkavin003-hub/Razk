@@ -93,6 +93,11 @@ curl http://localhost:5000/api/health
 
 The health response includes server status, database status, configured environment variable status, allowed web origins, and mobile WebView origins.
 
+Production hardening, Cloudinary, Atlas backups, Render/Vercel deployment, rollback, and k6 staging instructions:
+
+- [Production hardening and deployment runbook](docs/production-hardening.md)
+- [50-user k6 load test](tests/load/README.md)
+
 ## Frontend
 
 From `client/`:
@@ -261,10 +266,12 @@ Required backend environment variables:
 ```env
 MONGO_URI=
 JWT_SECRET=
-JWT_REFRESH_SECRET=
-PORT=
 CLIENT_ORIGIN=https://your-frontend-domain.com
+CLOUDINARY_CLOUD_NAME=
+CLOUDINARY_API_KEY=
+CLOUDINARY_API_SECRET=
 ALLOW_LOCAL_STORE=false
+SENTRY_DSN=
 ```
 
 If you use SQL Server in production, set:

@@ -1,4 +1,5 @@
 const asyncHandler = require("../utils/asyncHandler");
+const { logInfo } = require("../utils/structuredLogger");
 const User = require("../models/User");
 
 const allowedEmployeeSelfFields = [
@@ -8,6 +9,9 @@ const allowedEmployeeSelfFields = [
   "emergencyContact",
   "profilePhoto"
 ];
+const bumpTokenVersion = (user) => {
+  user.tokenVersion = Number(user.tokenVersion || 0) + 1;
+};
 
 const getEmployees = asyncHandler(async (req, res) => {
   const { department, role, search } = req.query;
@@ -91,6 +95,9 @@ const updateEmployee = asyncHandler(async (req, res) => {
       }
     });
   } else {
+    const shouldInvalidateSession =
+      (Object.prototype.hasOwnProperty.call(req.body, "password") && Boolean(req.body.password)) ||
+      (Object.prototype.hasOwnProperty.call(req.body, "role") && req.body.role !== employee.role);
     const updatableFields = [
       "name",
       "email",
@@ -114,6 +121,7 @@ const updateEmployee = asyncHandler(async (req, res) => {
         employee[field] = req.body[field];
       }
     });
+    if (shouldInvalidateSession) bumpTokenVersion(employee);
   }
 
   const updated = await employee.save();
@@ -159,8 +167,14 @@ const resetEmployeeDevice = asyncHandler(async (req, res) => {
   employee.deviceRejectedBy = undefined;
   employee.deviceResetAt = new Date();
   employee.deviceResetBy = req.user._id;
+  bumpTokenVersion(employee);
   await employee.save();
 
+  logInfo("device_reset", {
+    employeeId: employee.employeeId,
+    performedBy: String(req.user._id),
+    userId: String(employee._id)
+  });
   res.json({ employee, message: "Employee device reset successfully" });
 });
 
@@ -186,8 +200,14 @@ const approveEmployeeDevice = asyncHandler(async (req, res) => {
   employee.pendingDeviceId = undefined;
   employee.pendingDeviceName = undefined;
   employee.deviceRequestedAt = undefined;
+  bumpTokenVersion(employee);
   await employee.save();
 
+  logInfo("device_approved", {
+    employeeId: employee.employeeId,
+    performedBy: String(req.user._id),
+    userId: String(employee._id)
+  });
   res.json({ employee, message: "Employee device approved successfully" });
 });
 
@@ -207,8 +227,14 @@ const rejectEmployeeDevice = asyncHandler(async (req, res) => {
   employee.deviceApprovedBy = undefined;
   employee.deviceRejectedAt = new Date();
   employee.deviceRejectedBy = req.user._id;
+  bumpTokenVersion(employee);
   await employee.save();
 
+  logInfo("device_rejected", {
+    employeeId: employee.employeeId,
+    performedBy: String(req.user._id),
+    userId: String(employee._id)
+  });
   res.json({ employee, message: "Employee device request rejected" });
 });
 

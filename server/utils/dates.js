@@ -1,8 +1,26 @@
 const pad = (value) => String(value).padStart(2, "0");
+const ATTENDANCE_TIME_ZONE = "Asia/Kolkata";
+
+const getTimeZoneParts = (date = new Date(), timeZone = ATTENDANCE_TIME_ZONE) => {
+  const current = new Date(date);
+  if (Number.isNaN(current.getTime())) return null;
+
+  const parts = new Intl.DateTimeFormat("en-CA", {
+    day: "2-digit",
+    hour: "2-digit",
+    hourCycle: "h23",
+    minute: "2-digit",
+    month: "2-digit",
+    timeZone,
+    year: "numeric"
+  }).formatToParts(current);
+  return Object.fromEntries(parts.map((part) => [part.type, part.value]));
+};
 
 const toDateKey = (date = new Date()) => {
-  const current = new Date(date);
-  return `${current.getFullYear()}-${pad(current.getMonth() + 1)}-${pad(current.getDate())}`;
+  const parts = getTimeZoneParts(date);
+  if (!parts) return "";
+  return `${parts.year}-${parts.month}-${parts.day}`;
 };
 
 const startOfDay = (date = new Date()) => {
@@ -17,8 +35,16 @@ const getWorkingHours = (checkIn, checkOut) => {
 };
 
 const isLateCheckIn = (date = new Date()) => {
-  const current = new Date(date);
-  return current.getHours() > 9 || (current.getHours() === 9 && current.getMinutes() > 30);
+  const parts = getTimeZoneParts(date);
+  if (!parts) return false;
+  const hour = Number(parts.hour);
+  const minute = Number(parts.minute);
+  return hour > 9 || (hour === 9 && minute > 30);
+};
+
+const minutesInAttendanceTimeZone = (date = new Date()) => {
+  const parts = getTimeZoneParts(date);
+  return parts ? Number(parts.hour) * 60 + Number(parts.minute) : null;
 };
 
 const daysBetweenInclusive = (fromDate, toDate) => {
@@ -30,8 +56,10 @@ const daysBetweenInclusive = (fromDate, toDate) => {
 };
 
 module.exports = {
+  ATTENDANCE_TIME_ZONE,
   daysBetweenInclusive,
   getWorkingHours,
+  minutesInAttendanceTimeZone,
   isLateCheckIn,
   startOfDay,
   toDateKey

@@ -1,5 +1,5 @@
 const express = require("express");
-const { uploadFile } = require("../controllers/uploadController");
+const { deleteUploadedFile, uploadFile } = require("../controllers/uploadController");
 const { protect } = require("../middleware/authMiddleware");
 const { upload } = require("../middleware/uploadMiddleware");
 
@@ -14,5 +14,6 @@ router.post("/document", (req, _res, next) => {
   req.uploadFolder = "documents";
   next();
 }, upload.single("file"), uploadFile);
+router.delete("/", deleteUploadedFile);
 
 module.exports = router;

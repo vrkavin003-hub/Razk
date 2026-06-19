@@ -1,3 +1,5 @@
+const { minutesInAttendanceTimeZone } = require("./dates");
+
 const SHIFT_NAMES = ["1st Shift", "2nd Shift", "3rd Shift", "General Shift"];
 
 const normalizeShiftName = (value) => {
@@ -8,7 +10,7 @@ const normalizeShiftName = (value) => {
 const minutesFromDate = (value) => {
   const date = new Date(value);
   if (Number.isNaN(date.getTime())) return null;
-  return date.getHours() * 60 + date.getMinutes();
+  return minutesInAttendanceTimeZone(date);
 };
 
 const inRange = (minutes, start, end) => {

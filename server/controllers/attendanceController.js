@@ -9,6 +9,12 @@ const { getShiftFromCheckIn } = require("../utils/shifts");
 const { isAssignedWeekOffDate, weekRangeForDateKey } = require("../utils/weekOff");
 const { normalizeAttendanceSite } = require("../utils/attendanceSites");
 const { normalizeDeviceName } = require("../utils/deviceApproval");
+const { logError, logInfo } = require("../utils/structuredLogger");
+const { deleteStoredFile, isAllowedAttendancePhotoUrl } = require("../utils/uploadStorage");
+const {
+  canViewAttendancePhoto,
+  sendAttendancePhoto
+} = require("../utils/attendancePhotoAccess");
 
 const employeeSelect = "name email employeeId department designation assignedShift weeklyWeekOffDay profilePhoto";
 const hrWeekOffSourceStatuses = ["Absent", "Leave", "Missed"];
@@ -31,67 +37,111 @@ const buildAttendanceQuery = async (filters = {}) => {
 };
 
 const checkIn = asyncHandler(async (req, res) => {
-  const date = toDateKey();
-  if (isAssignedWeekOffDate(req.user, date)) {
-    res.status(400);
-    throw new Error(`Today is assigned as ${req.user.weeklyWeekOffDay || "Week Off"} for this employee`);
-  }
+  try {
+    const date = toDateKey();
+    if (isAssignedWeekOffDate(req.user, date)) {
+      res.status(400);
+      throw new Error(`Today is assigned as ${req.user.weeklyWeekOffDay || "Week Off"} for this employee`);
+    }
 
-  const existing = await Attendance.findOne({ employee: req.user._id, date });
+    const existing = await Attendance.findOne({ employee: req.user._id, date });
+    if (existing) {
+      res.status(409);
+      throw new Error("You have already checked in today");
+    }
 
-  if (existing) {
-    res.status(409);
-    throw new Error("You have already checked in today");
-  }
+    const now = new Date();
+    const location = normalizeAttendanceLocation(req.body, now);
+    const attendanceSite = normalizeAttendanceSite(req.body.attendanceSite);
+    if (!attendanceSite) {
+      res.status(400);
+      throw new Error("Select a valid attendance site: Chennai or Hosur");
+    }
+    const attendancePhoto = String(req.body.attendancePhoto || "").trim();
+    if (!attendancePhoto) {
+      res.status(400);
+      throw new Error("Attendance photo is required for check-in");
+    }
+    if (!isAllowedAttendancePhotoUrl({
+      provider: req.body.attendancePhotoProvider,
+      publicId: req.body.attendancePhotoPublicId,
+      url: attendancePhoto,
+      userId: req.user._id
+    })) {
+      res.status(400);
+      throw new Error("Attendance photo must be uploaded before check-in");
+    }
+    const requestedCaptureTime = new Date(req.body.attendancePhotoCapturedAt || now);
+    if (
+      Number.isNaN(requestedCaptureTime.getTime()) ||
+      requestedCaptureTime.getTime() > now.getTime() + 5 * 60 * 1000 ||
+      requestedCaptureTime.getTime() < now.getTime() - 24 * 60 * 60 * 1000
+    ) {
+      res.status(400);
+      throw new Error("Attendance photo capture time is invalid");
+    }
+    const shiftName = getShiftFromCheckIn(now, req.user.assignedShift);
+    const attendance = await Attendance.create({
+      employee: req.user._id,
+      employeeId: req.user.employeeId || String(req.user._id),
+      date,
+      checkIn: now,
+      shiftName,
+      checkInLatitude: location.latitude,
+      checkInLongitude: location.longitude,
+      checkInAccuracy: location.accuracy,
+      checkInLocationStatus: location.locationStatus,
+      checkInLocationCapturedAt: location.capturedAt,
+      checkInDistanceMeters: null,
+      attendanceSite,
+      checkInPhoto: attendancePhoto,
+      checkInPhotoProvider: req.body.attendancePhotoProvider || "",
+      checkInPhotoPublicId: req.body.attendancePhotoPublicId || "",
+      checkInPhotoResourceType: req.body.attendancePhotoResourceType || "image",
+      checkInPhotoDevice: normalizeDeviceName(req.body.attendancePhotoDevice),
+      checkInPhotoCapturedAt: requestedCaptureTime,
+      status: isLateCheckIn(now) ? "Late" : "Present",
+      locationNote: req.body.locationNote,
+      remarks: req.body.remarks
+    });
 
-  const now = new Date();
-  const location = normalizeAttendanceLocation(req.body, now);
-  const attendanceSite = normalizeAttendanceSite(req.body.attendanceSite);
-  if (!attendanceSite) {
-    res.status(400);
-    throw new Error("Select a valid attendance site: Chennai or Hosur");
+    logInfo("attendance_check_in_succeeded", {
+      site: attendanceSite,
+      userId: String(req.user._id)
+    });
+    res.status(201).json({ attendance, location, message: "Check-in marked successfully." });
+  } catch (error) {
+    if (error?.code === 11000) {
+      error.statusCode = 409;
+      error.message = "You have already checked in today";
+      res.status(409);
+    }
+    logError("attendance_check_in_failed", {
+      message: error.message,
+      statusCode: error.statusCode || res.statusCode,
+      userId: String(req.user._id)
+    });
+    try {
+      const referencedUpload = req.body.attendancePhotoPublicId
+        ? await Attendance.exists({ checkInPhotoPublicId: req.body.attendancePhotoPublicId })
+        : null;
+      if (!referencedUpload) {
+        await deleteStoredFile({
+          folder: "images",
+          provider: req.body.attendancePhotoProvider,
+          publicId: req.body.attendancePhotoPublicId,
+          resourceType: req.body.attendancePhotoResourceType,
+          userId: req.user._id
+        });
+      }
+    } catch (cleanupError) {
+      logError("attendance_orphan_cleanup_failed", {
+        message: cleanupError.message,
+        userId: String(req.user._id)
+      });
+    }
+    throw error;
   }
-  const attendancePhoto = String(req.body.attendancePhoto || "").trim();
-  if (!attendancePhoto) {
-    res.status(400);
-    throw new Error("Attendance photo is required for check-in");
-  }
-  if (!/^\/uploads\/images\/[^/?#]+$/.test(attendancePhoto)) {
-    res.status(400);
-    throw new Error("Attendance photo must be uploaded before check-in");
-  }
-  const requestedCaptureTime = new Date(req.body.attendancePhotoCapturedAt || now);
-  if (
-    Number.isNaN(requestedCaptureTime.getTime()) ||
-    requestedCaptureTime.getTime() > now.getTime() + 5 * 60 * 1000 ||
-    requestedCaptureTime.getTime() < now.getTime() - 24 * 60 * 60 * 1000
-  ) {
-    res.status(400);
-    throw new Error("Attendance photo capture time is invalid");
-  }
-  const shiftName = getShiftFromCheckIn(now, req.user.assignedShift);
-  const attendance = await Attendance.create({
-    employee: req.user._id,
-    employeeId: req.user.employeeId || String(req.user._id),
-    date,
-    checkIn: now,
-    shiftName,
-    checkInLatitude: location.latitude,
-    checkInLongitude: location.longitude,
-    checkInAccuracy: location.accuracy,
-    checkInLocationStatus: location.locationStatus,
-    checkInLocationCapturedAt: location.capturedAt,
-    checkInDistanceMeters: null,
-    attendanceSite,
-    checkInPhoto: attendancePhoto,
-    checkInPhotoDevice: normalizeDeviceName(req.body.attendancePhotoDevice),
-    checkInPhotoCapturedAt: requestedCaptureTime,
-    status: isLateCheckIn(now) ? "Late" : "Present",
-    locationNote: req.body.locationNote,
-    remarks: req.body.remarks
-  });
-
-  res.status(201).json({ attendance, location, message: "Check-in marked successfully." });
 });
 
 const checkOut = asyncHandler(async (req, res) => {
@@ -136,18 +186,19 @@ const checkOut = asyncHandler(async (req, res) => {
 });
 
 const getTodayAttendance = asyncHandler(async (req, res) => {
+  const date = toDateKey();
   const attendance = await Attendance.findOne({
     employee: req.user._id,
-    date: toDateKey()
+    date
   });
 
-  if (!attendance && isAssignedWeekOffDate(req.user, toDateKey())) {
+  if (!attendance && isAssignedWeekOffDate(req.user, date)) {
     res.json({
       attendance: {
-        _id: `week-off-${req.user._id}-${toDateKey()}`,
+        _id: `week-off-${req.user._id}-${date}`,
         employee: req.user._id,
         employeeId: req.user.employeeId || String(req.user._id),
-        date: toDateKey(),
+        date,
         status: "Week Off",
         shiftName: "Weekly Week Off",
         workingHours: 0,
@@ -159,6 +210,21 @@ const getTodayAttendance = asyncHandler(async (req, res) => {
   }
 
   res.json({ attendance });
+});
+
+const getAttendancePhoto = asyncHandler(async (req, res) => {
+  const attendance = await Attendance.findById(req.params.id).select(
+    "employee checkInPhoto checkInPhotoProvider checkInPhotoPublicId"
+  );
+  if (!attendance) {
+    res.status(404);
+    throw new Error("Attendance record not found");
+  }
+  if (!canViewAttendancePhoto(attendance, req.user)) {
+    res.status(403);
+    throw new Error("You are not allowed to view this attendance photo");
+  }
+  await sendAttendancePhoto(attendance, res);
 });
 
 const getMyHistory = asyncHandler(async (req, res) => {
@@ -333,6 +399,7 @@ module.exports = {
   checkOut,
   exportCsv,
   getAllAttendance,
+  getAttendancePhoto,
   getMyHistory,
   getReport,
   getTodayAttendance,

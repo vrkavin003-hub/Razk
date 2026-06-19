@@ -82,7 +82,8 @@ export const AuthProvider = ({ children }) => {
       setUser(data.user);
       return data.user;
     } catch (error) {
-      clearSession();
+      // The API interceptor clears genuinely expired/invalid 401 sessions.
+      // Keep the approved-device session during temporary network or backend outages.
       throw error;
     }
   };

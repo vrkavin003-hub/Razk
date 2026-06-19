@@ -4,6 +4,7 @@ const {
   checkOut,
   exportCsv,
   getAllAttendance,
+  getAttendancePhoto,
   getMyHistory,
   getReport,
   getTodayAttendance,
@@ -18,6 +19,7 @@ router.post("/check-in", authorize("employee", "hr", "admin", "dri"), checkIn);
 router.post("/check-out", authorize("employee", "hr", "admin", "dri"), checkOut);
 router.post("/week-off", authorize("admin", "hr"), markWeekOff);
 router.get("/today", getTodayAttendance);
+router.get("/:id/photo", getAttendancePhoto);
 router.get("/my-attendance", getMyHistory);
 router.get("/my-history", getMyHistory);
 router.get("/all", authorize("admin", "hr"), getAllAttendance);

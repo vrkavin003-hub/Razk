@@ -1,5 +1,6 @@
 import axios from "axios";
 import { API_BASE_URL, apiConfigurationWarning } from "../config/api";
+import { getDeviceInfo } from "../utils/device";
 
 export { API_BASE_URL };
 
@@ -35,19 +36,28 @@ api.interceptors.request.use((config) => {
   const token = getSessionToken();
   if (token) {
     config.headers.Authorization = `Bearer ${token}`;
+    config.headers["X-Device-Id"] = getDeviceInfo().deviceId;
   }
   return config;
 });
 
 api.interceptors.response.use(
   (response) => response,
-  (error) => {
+  async (error) => {
     if (error.response?.status === 401) {
       clearAuthStorage();
       window.dispatchEvent(new Event("razk:auth-expired"));
     }
 
-    const serverMessage = error.response?.data?.message;
+    let serverMessage = error.response?.data?.message;
+    if (!serverMessage && error.response?.data instanceof Blob) {
+      try {
+        const payload = JSON.parse(await error.response.data.text());
+        serverMessage = payload?.message;
+      } catch {
+        // Non-JSON blob responses use the normal status fallback below.
+      }
+    }
     const validationMessage = error.response?.data?.errors?.[0]?.message;
     const statusMessage = error.response?.status
       ? `The Razk Automation API responded with ${error.response.status}.`

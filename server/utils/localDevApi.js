@@ -1,16 +1,18 @@
 const bcrypt = require("bcryptjs");
 const crypto = require("crypto");
 const fs = require("fs");
-const jwt = require("jsonwebtoken");
 const path = require("path");
-const { getJwtSecret } = require("../config/authSecret");
 const toCsv = require("./csv");
 const { daysBetweenInclusive, getWorkingHours, isLateCheckIn, toDateKey } = require("./dates");
 const { buildLocationDecision, normalizeAttendanceLocation, validateCoordinates } = require("./geo");
 const { getShiftFromCheckIn } = require("./shifts");
 const { normalizeAttendanceSite } = require("./attendanceSites");
 const { normalizeDeviceId, normalizeDeviceName } = require("./deviceApproval");
-const { fileUrl, upload } = require("../middleware/uploadMiddleware");
+const { generateToken, hashDeviceId, verifyToken } = require("./authToken");
+const { logError, logInfo, logWarn } = require("./structuredLogger");
+const { deleteStoredFile, isAllowedAttendancePhotoUrl, storeUploadedFile } = require("./uploadStorage");
+const { canViewAttendancePhoto, sendAttendancePhoto } = require("./attendancePhotoAccess");
+const { upload } = require("../middleware/uploadMiddleware");
 const {
   PAID_LEAVE_DAYS_PER_YEAR,
   PAID_PERMISSION_HOURS_PER_MONTH,
@@ -29,7 +31,9 @@ const {
 const { sendReportExcel } = require("./excelReportBuilder");
 
 const DATA_DIR = path.join(__dirname, "..", "data");
-const DATA_FILE = path.join(DATA_DIR, "local-dev-db.json");
+const DATA_FILE = process.env.LOCAL_STORE_FILE
+  ? path.resolve(process.env.LOCAL_STORE_FILE)
+  : path.join(DATA_DIR, "local-dev-db.json");
 
 const json = (res, data, status = 200) => res.status(status).json(data);
 const newId = () => crypto.randomUUID();
@@ -130,7 +134,7 @@ const createInitialData = () => ({
 const loadDb = () => {
   if (!fs.existsSync(DATA_FILE)) {
     const initialData = createInitialData();
-    fs.mkdirSync(DATA_DIR, { recursive: true });
+    fs.mkdirSync(path.dirname(DATA_FILE), { recursive: true });
     fs.writeFileSync(DATA_FILE, JSON.stringify(initialData, null, 2));
     return initialData;
   }
@@ -161,7 +165,7 @@ db.permissions = db.permissions || [];
 db.users = db.users || [];
 
 const saveDb = () => {
-  fs.mkdirSync(DATA_DIR, { recursive: true });
+  fs.mkdirSync(path.dirname(DATA_FILE), { recursive: true });
   fs.writeFileSync(DATA_FILE, JSON.stringify(db, null, 2));
 };
 
@@ -176,10 +180,9 @@ const sanitizeUser = (user) => {
   return safe;
 };
 
-const generateToken = (id) =>
-  jwt.sign({ id }, getJwtSecret(), {
-    expiresIn: "7d"
-  });
+const bumpTokenVersion = (user) => {
+  user.tokenVersion = Number(user.tokenVersion || 0) + 1;
+};
 
 const matchUser = (id) => db.users.find((user) => user._id === id && user.isActive);
 
@@ -192,9 +195,26 @@ const protect = (req, res, next) => {
   }
 
   try {
-    const decoded = jwt.verify(token, getJwtSecret());
+    const decoded = verifyToken(token);
     const user = matchUser(decoded.id);
     if (!user) return json(res, { message: "Not authorized, user inactive or missing" }, 401);
+    if (Number(decoded.tokenVersion || 0) !== Number(user.tokenVersion || 0)) {
+      return json(res, { message: "Your session has expired. Please login again." }, 401);
+    }
+    if (user.role === "employee") {
+      const deviceId = normalizeDeviceId(req.get("x-device-id"));
+      const requestDeviceHash = deviceId ? hashDeviceId(deviceId) : "";
+      const approvedDeviceHash = user.registeredDeviceId ? hashDeviceId(user.registeredDeviceId) : "";
+      if (
+        !deviceId ||
+        user.deviceApprovalStatus !== "approved" ||
+        !approvedDeviceHash ||
+        decoded.deviceHash !== requestDeviceHash ||
+        approvedDeviceHash !== requestDeviceHash
+      ) {
+        return json(res, { message: "This employee session is not valid for the approved device." }, 401);
+      }
+    }
     req.user = user;
     return next();
   } catch {
@@ -461,6 +481,7 @@ const mountLocalDevApi = (app) => {
     asyncRoute(async (req, res) => {
       const { deviceId, deviceName, email, password } = req.body;
       const loginId = String(email || "").trim();
+      let approvedDeviceId = "";
       const user = db.users.find(
         (item) =>
           item.isActive &&
@@ -471,6 +492,7 @@ const mountLocalDevApi = (app) => {
       );
 
       if (!user || !(await bcrypt.compare(password || "", user.password))) {
+        logWarn("login_failed", { reason: "invalid_credentials" });
         return json(res, { message: "Invalid email or password" }, 401);
       }
 
@@ -487,7 +509,11 @@ const mountLocalDevApi = (app) => {
           return json(res, { message: "A valid device ID is required for employee login" }, 400);
         }
         if (user.registeredDeviceId === normalizedDeviceId) {
-          user.deviceApprovalStatus = "approved";
+          if (user.deviceApprovalStatus !== "approved") {
+            user.deviceApprovalStatus = "approved";
+            bumpTokenVersion(user);
+          }
+          approvedDeviceId = normalizedDeviceId;
           saveDb();
         } else if (user.registeredDeviceId) {
           return json(res, { message: "This employee account is registered to another device. Please contact HR." }, 403);
@@ -511,6 +537,7 @@ const mountLocalDevApi = (app) => {
           delete user.deviceRejectedAt;
           delete user.deviceRejectedBy;
           saveDb();
+          logInfo("device_approval_requested", { userId: user._id });
           return json(res, {
             requiresDeviceApproval: true,
             message: "Your device approval request has been sent to HR. You can login after HR approves this device."
@@ -518,9 +545,10 @@ const mountLocalDevApi = (app) => {
         }
       }
 
+      logInfo("login_succeeded", { role: user.role, userId: user._id });
       return json(res, {
         user: sanitizeUser(user),
-        token: generateToken(user._id)
+        token: generateToken(user, user.role === "employee" ? approvedDeviceId : "")
       });
     })
   );
@@ -543,13 +571,17 @@ const mountLocalDevApi = (app) => {
         email: String(req.body.email).toLowerCase(),
         password: await bcrypt.hash(req.body.password, 10),
         role: req.body.role || "employee",
+        tokenVersion: 0,
         isActive: req.body.isActive ?? true,
         createdAt: new Date().toISOString(),
         updatedAt: new Date().toISOString()
       };
       db.users.push(user);
       saveDb();
-      return json(res, { user: sanitizeUser(user), token: generateToken(user._id) }, 201);
+      return json(res, {
+        user: sanitizeUser(user),
+        token: user.role === "employee" ? undefined : generateToken(user)
+      }, 201);
     })
   );
 
@@ -572,6 +604,7 @@ const mountLocalDevApi = (app) => {
       );
       if (!user) return json(res, { message: "Reset token is invalid or expired" }, 400);
       user.password = await bcrypt.hash(req.body.password, 10);
+      bumpTokenVersion(user);
       delete user.resetPasswordToken;
       delete user.resetPasswordExpires;
       user.updatedAt = new Date().toISOString();
@@ -582,6 +615,28 @@ const mountLocalDevApi = (app) => {
 
   app.get("/api/auth/me", protect, (req, res) => json(res, { user: sanitizeUser(req.user) }));
 
+  app.put(
+    "/api/auth/change-password",
+    protect,
+    asyncRoute(async (req, res) => {
+      const { confirmNewPassword, currentPassword, newPassword } = req.body;
+      if (!currentPassword || !newPassword || !confirmNewPassword) {
+        return json(res, { message: "Current password, new password, and confirm password are required" }, 400);
+      }
+      if (newPassword !== confirmNewPassword) {
+        return json(res, { message: "New password and confirm password do not match" }, 400);
+      }
+      if (!(await bcrypt.compare(currentPassword, req.user.password))) {
+        return json(res, { message: "Current password is incorrect" }, 401);
+      }
+      req.user.password = await bcrypt.hash(newPassword, 10);
+      bumpTokenVersion(req.user);
+      req.user.updatedAt = new Date().toISOString();
+      saveDb();
+      return json(res, { message: "Password changed successfully" });
+    })
+  );
+
   app.post(
     "/api/uploads/image",
     protect,
@@ -590,18 +645,11 @@ const mountLocalDevApi = (app) => {
       next();
     },
     upload.single("file"),
-    (req, res) => {
+    asyncRoute(async (req, res) => {
       if (!req.file) return json(res, { message: "File is required" }, 400);
-      return json(res, {
-        file: {
-          filename: req.file.filename,
-          originalName: req.file.originalname,
-          mimeType: req.file.mimetype,
-          size: req.file.size,
-          url: fileUrl(req.file, "images")
-        }
-      }, 201);
-    }
+      const file = await storeUploadedFile({ file: req.file, folder: "images", userId: req.user._id });
+      return json(res, { file }, 201);
+    })
   );
 
   app.post(
@@ -612,18 +660,32 @@ const mountLocalDevApi = (app) => {
       next();
     },
     upload.single("file"),
-    (req, res) => {
+    asyncRoute(async (req, res) => {
       if (!req.file) return json(res, { message: "File is required" }, 400);
-      return json(res, {
-        file: {
-          filename: req.file.filename,
-          originalName: req.file.originalname,
-          mimeType: req.file.mimetype,
-          size: req.file.size,
-          url: fileUrl(req.file, "documents")
-        }
-      }, 201);
-    }
+      const file = await storeUploadedFile({ file: req.file, folder: "documents", userId: req.user._id });
+      return json(res, { file }, 201);
+    })
+  );
+
+  app.delete(
+    "/api/uploads",
+    protect,
+    asyncRoute(async (req, res) => {
+      if (
+        req.body.publicId &&
+        db.attendance.some((record) => record.checkInPhotoPublicId === req.body.publicId)
+      ) {
+        return json(res, { message: "This upload is already attached to an attendance record" }, 409);
+      }
+      const deleted = await deleteStoredFile({
+        folder: req.body.folder || "images",
+        provider: req.body.provider,
+        publicId: req.body.publicId,
+        resourceType: req.body.resourceType,
+        userId: req.user._id
+      });
+      return json(res, { deleted });
+    })
   );
 
   app.get("/api/employees", protect, authorize("admin", "hr"), (req, res) => {
@@ -708,12 +770,17 @@ const mountLocalDevApi = (app) => {
         "isActive"
       ];
       const fields = req.user.role === "employee" ? selfFields : adminFields;
+      const invalidateSession =
+        req.user.role !== "employee" &&
+        ((Object.prototype.hasOwnProperty.call(req.body, "password") && Boolean(req.body.password)) ||
+          (Object.prototype.hasOwnProperty.call(req.body, "role") && req.body.role !== employee.role));
 
       for (const field of fields) {
         if (Object.prototype.hasOwnProperty.call(req.body, field)) {
           employee[field] = field === "password" && req.body[field] ? await bcrypt.hash(req.body[field], 10) : req.body[field];
         }
       }
+      if (invalidateSession) bumpTokenVersion(employee);
       employee.updatedAt = new Date().toISOString();
       saveDb();
       return json(res, { employee: sanitizeUser(employee) });
@@ -744,8 +811,10 @@ const mountLocalDevApi = (app) => {
     delete employee.pendingDeviceId;
     delete employee.pendingDeviceName;
     delete employee.deviceRequestedAt;
+    bumpTokenVersion(employee);
     employee.updatedAt = new Date().toISOString();
     saveDb();
+    logInfo("device_approved", { performedBy: req.user._id, userId: employee._id });
     return json(res, { employee: sanitizeUser(employee), message: "Employee device approved successfully" });
   });
 
@@ -757,8 +826,10 @@ const mountLocalDevApi = (app) => {
     employee.deviceApprovalStatus = "rejected";
     employee.deviceRejectedAt = new Date().toISOString();
     employee.deviceRejectedBy = req.user._id;
+    bumpTokenVersion(employee);
     employee.updatedAt = new Date().toISOString();
     saveDb();
+    logInfo("device_rejected", { performedBy: req.user._id, userId: employee._id });
     return json(res, { employee: sanitizeUser(employee), message: "Employee device request rejected" });
   });
 
@@ -781,8 +852,10 @@ const mountLocalDevApi = (app) => {
     employee.deviceApprovalStatus = "none";
     employee.deviceResetAt = new Date().toISOString();
     employee.deviceResetBy = req.user._id;
+    bumpTokenVersion(employee);
     employee.updatedAt = new Date().toISOString();
     saveDb();
+    logInfo("device_reset", { performedBy: req.user._id, userId: employee._id });
     return json(res, { employee: sanitizeUser(employee), message: "Employee device reset successfully" });
   });
 
@@ -878,64 +951,95 @@ const mountLocalDevApi = (app) => {
     }
   });
 
-  app.post("/api/attendance/check-in", protect, authorize("employee", "hr", "admin", "dri"), (req, res) => {
-    const date = toDateKey();
-    if (db.attendance.some((record) => record.employee === req.user._id && record.date === date)) {
-      return json(res, { message: "You have already checked in today" }, 409);
-    }
-    const now = new Date();
-    const location = normalizeAttendanceLocation(req.body, now);
-    const attendanceSite = normalizeAttendanceSite(req.body.attendanceSite);
-    if (!attendanceSite) return json(res, { message: "Select a valid attendance site: Chennai or Hosur" }, 400);
-    const attendancePhoto = String(req.body.attendancePhoto || "").trim();
-    if (!attendancePhoto) return json(res, { message: "Attendance photo is required for check-in" }, 400);
-    if (!/^\/uploads\/images\/[^/?#]+$/.test(attendancePhoto)) {
-      return json(res, { message: "Attendance photo must be uploaded before check-in" }, 400);
-    }
-    const requestedCaptureTime = new Date(req.body.attendancePhotoCapturedAt || now);
-    if (
-      Number.isNaN(requestedCaptureTime.getTime()) ||
-      requestedCaptureTime.getTime() > now.getTime() + 5 * 60 * 1000 ||
-      requestedCaptureTime.getTime() < now.getTime() - 24 * 60 * 60 * 1000
-    ) {
-      return json(res, { message: "Attendance photo capture time is invalid" }, 400);
-    }
-    const shiftName = getShiftFromCheckIn(now, req.user.assignedShift);
-    const attendance = {
-      _id: newId(),
-      employee: req.user._id,
-      employeeId: req.user.employeeId || req.user._id,
-      date,
-      checkIn: now.toISOString(),
-      shiftName,
-      checkInLatitude: location.latitude,
-      checkInLongitude: location.longitude,
-      checkInAccuracy: location.accuracy,
-      checkInLocationStatus: location.locationStatus,
-      checkInLocationCapturedAt: location.capturedAt.toISOString(),
-      checkInDistanceMeters: null,
-      attendanceSite,
-      checkInPhoto: attendancePhoto,
-      checkInPhotoDevice: normalizeDeviceName(req.body.attendancePhotoDevice),
-      checkInPhotoCapturedAt: requestedCaptureTime.toISOString(),
-      checkOut: null,
-      checkOutLatitude: null,
-      checkOutLongitude: null,
-      checkOutAccuracy: null,
-      checkOutLocationStatus: "Location not available",
-      checkOutLocationCapturedAt: null,
-      checkOutDistanceMeters: null,
-      workingHours: 0,
-      status: isLateCheckIn(now) ? "Late" : "Present",
-      locationNote: req.body.locationNote || "",
-      remarks: req.body.remarks || "",
-      createdAt: now.toISOString(),
-      updatedAt: now.toISOString()
-    };
-    db.attendance.push(attendance);
-    saveDb();
-    return json(res, { attendance, location, message: "Check-in marked successfully." }, 201);
-  });
+  app.post(
+    "/api/attendance/check-in",
+    protect,
+    authorize("employee", "hr", "admin", "dri"),
+    asyncRoute(async (req, res) => {
+      try {
+        const date = toDateKey();
+        if (db.attendance.some((record) => record.employee === req.user._id && record.date === date)) {
+          return json(res, { message: "You have already checked in today" }, 409);
+        }
+        const now = new Date();
+        const location = normalizeAttendanceLocation(req.body, now);
+        const attendanceSite = normalizeAttendanceSite(req.body.attendanceSite);
+        if (!attendanceSite) return json(res, { message: "Select a valid attendance site: Chennai or Hosur" }, 400);
+        const attendancePhoto = String(req.body.attendancePhoto || "").trim();
+        if (!attendancePhoto) return json(res, { message: "Attendance photo is required for check-in" }, 400);
+        if (!isAllowedAttendancePhotoUrl({
+          provider: req.body.attendancePhotoProvider,
+          publicId: req.body.attendancePhotoPublicId,
+          url: attendancePhoto,
+          userId: req.user._id
+        })) {
+          return json(res, { message: "Attendance photo must be uploaded before check-in" }, 400);
+        }
+        const requestedCaptureTime = new Date(req.body.attendancePhotoCapturedAt || now);
+        if (
+          Number.isNaN(requestedCaptureTime.getTime()) ||
+          requestedCaptureTime.getTime() > now.getTime() + 5 * 60 * 1000 ||
+          requestedCaptureTime.getTime() < now.getTime() - 24 * 60 * 60 * 1000
+        ) {
+          return json(res, { message: "Attendance photo capture time is invalid" }, 400);
+        }
+        const shiftName = getShiftFromCheckIn(now, req.user.assignedShift);
+        const attendance = {
+          _id: newId(),
+          employee: req.user._id,
+          employeeId: req.user.employeeId || req.user._id,
+          date,
+          checkIn: now.toISOString(),
+          shiftName,
+          checkInLatitude: location.latitude,
+          checkInLongitude: location.longitude,
+          checkInAccuracy: location.accuracy,
+          checkInLocationStatus: location.locationStatus,
+          checkInLocationCapturedAt: location.capturedAt.toISOString(),
+          checkInDistanceMeters: null,
+          attendanceSite,
+          checkInPhoto: attendancePhoto,
+          checkInPhotoProvider: req.body.attendancePhotoProvider || "",
+          checkInPhotoPublicId: req.body.attendancePhotoPublicId || "",
+          checkInPhotoResourceType: req.body.attendancePhotoResourceType || "image",
+          checkInPhotoDevice: normalizeDeviceName(req.body.attendancePhotoDevice),
+          checkInPhotoCapturedAt: requestedCaptureTime.toISOString(),
+          checkOut: null,
+          checkOutLatitude: null,
+          checkOutLongitude: null,
+          checkOutAccuracy: null,
+          checkOutLocationStatus: "Location not available",
+          checkOutLocationCapturedAt: null,
+          checkOutDistanceMeters: null,
+          workingHours: 0,
+          status: isLateCheckIn(now) ? "Late" : "Present",
+          locationNote: req.body.locationNote || "",
+          remarks: req.body.remarks || "",
+          createdAt: now.toISOString(),
+          updatedAt: now.toISOString()
+        };
+        db.attendance.push(attendance);
+        saveDb();
+        logInfo("attendance_check_in_succeeded", { site: attendanceSite, userId: req.user._id });
+        return json(res, { attendance, location, message: "Check-in marked successfully." }, 201);
+      } catch (error) {
+        logError("attendance_check_in_failed", { message: error.message, userId: req.user._id });
+        const referencedUpload = req.body.attendancePhotoPublicId
+          ? db.attendance.some((record) => record.checkInPhotoPublicId === req.body.attendancePhotoPublicId)
+          : false;
+        if (!referencedUpload) {
+          await deleteStoredFile({
+            folder: "images",
+            provider: req.body.attendancePhotoProvider,
+            publicId: req.body.attendancePhotoPublicId,
+            resourceType: req.body.attendancePhotoResourceType,
+            userId: req.user._id
+          });
+        }
+        throw error;
+      }
+    })
+  );
 
   app.post("/api/attendance/check-out", protect, authorize("employee", "hr", "admin", "dri"), (req, res) => {
     const date = toDateKey();
@@ -962,6 +1066,19 @@ const mountLocalDevApi = (app) => {
     const attendance = db.attendance.find((record) => record.employee === req.user._id && record.date === toDateKey());
     return json(res, { attendance: attendance || null });
   });
+
+  app.get(
+    "/api/attendance/:id/photo",
+    protect,
+    asyncRoute(async (req, res) => {
+      const attendance = db.attendance.find((record) => record._id === req.params.id);
+      if (!attendance) return json(res, { message: "Attendance record not found" }, 404);
+      if (!canViewAttendancePhoto(attendance, req.user)) {
+        return json(res, { message: "You are not allowed to view this attendance photo" }, 403);
+      }
+      await sendAttendancePhoto(attendance, res);
+    })
+  );
 
   app.get("/api/attendance/my-history", protect, (req, res) => {
     const attendance = db.attendance

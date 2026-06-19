@@ -36,6 +36,9 @@ const attendanceSchema = new mongoose.Schema(
       enum: ["Chennai", "Hosur"]
     },
     checkInPhoto: String,
+    checkInPhotoProvider: String,
+    checkInPhotoPublicId: String,
+    checkInPhotoResourceType: String,
     checkInPhotoDevice: String,
     checkInPhotoCapturedAt: Date,
     checkOut: Date,
@@ -71,5 +74,6 @@ const attendanceSchema = new mongoose.Schema(
 );
 
 attendanceSchema.index({ employee: 1, date: 1 }, { unique: true });
+attendanceSchema.index({ date: 1 });
 
 module.exports = mongoose.model("Attendance", attendanceSchema);

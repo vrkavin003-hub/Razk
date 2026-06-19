@@ -8,6 +8,11 @@
     "dev:server": "npm --prefix server run dev",
     "dev:client": "npm --prefix client run dev",
     "build": "npm --prefix client run build",
+    "test:attendance": "node tests/integration/attendance-local.js",
+    "test:attendance-photo": "node tests/unit/attendance-photo.mjs",
+    "test:device-persistence": "node tests/unit/device-persistence.mjs",
+    "load:inspect": "k6 inspect -e K6_VALIDATE_ONLY=true tests/load/razk-50-users.js",
+    "load:test": "k6 run tests/load/razk-50-users.js",
     "seed": "npm --prefix server run seed",
     "install:all": "npm --prefix server install && npm --prefix client install"
   }

@@ -1,53 +1,40 @@
-const fs = require("fs");
-const path = require("path");
 const multer = require("multer");
 
-const uploadRoot = path.join(__dirname, "..", "uploads");
-
-const ensureDirectory = (directory) => {
-  fs.mkdirSync(directory, { recursive: true });
-};
-
-const storage = multer.diskStorage({
-  destination: (req, _file, cb) => {
-    const folder = req.uploadFolder || "images";
-    const destination = path.join(uploadRoot, folder);
-    ensureDirectory(destination);
-    cb(null, destination);
-  },
-  filename: (_req, file, cb) => {
-    const safeName = file.originalname.replace(/[^a-zA-Z0-9._-]/g, "-");
-    cb(null, `${Date.now()}-${safeName}`);
-  }
-});
-
-const allowedMimeTypes = new Set([
+const imageMimeTypes = new Set([
   "image/jpeg",
   "image/png",
   "image/webp",
-  "image/gif",
+  "image/gif"
+]);
+
+const documentMimeTypes = new Set([
+  ...imageMimeTypes,
   "application/pdf",
   "application/msword",
   "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
 ]);
 
+const uploadValidationError = (message) => {
+  const error = new Error(message);
+  error.statusCode = 400;
+  return error;
+};
+
 const upload = multer({
-  storage,
+  storage: multer.memoryStorage(),
   limits: {
     fileSize: Number(process.env.MAX_UPLOAD_BYTES || 5 * 1024 * 1024)
   },
-  fileFilter: (_req, file, cb) => {
+  fileFilter: (req, file, cb) => {
+    const allowedMimeTypes = req.uploadFolder === "images" ? imageMimeTypes : documentMimeTypes;
     if (!allowedMimeTypes.has(file.mimetype)) {
-      cb(new Error("Only image, PDF, DOC, and DOCX files are allowed"));
+      cb(uploadValidationError(req.uploadFolder === "images" ? "Only image files are allowed" : "Unsupported document type"));
       return;
     }
     cb(null, true);
   }
 });
 
-const fileUrl = (file, folder = "images") => (file ? `/uploads/${folder}/${file.filename}` : "");
-
 module.exports = {
-  fileUrl,
   upload
 };

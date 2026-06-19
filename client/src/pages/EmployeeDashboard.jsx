@@ -3,19 +3,17 @@ import { useEffect, useState } from "react";
 import toast from "react-hot-toast";
 import Button from "../components/Button";
 import AttendanceCamera from "../components/AttendanceCamera";
+import AttendancePhotoLink from "../components/AttendancePhotoLink";
 import DateTimeDisplay from "../components/DateTimeDisplay";
 import EmptyState from "../components/EmptyState";
 import Loading from "../components/Loading";
 import PageHeader from "../components/PageHeader";
 import StatCard from "../components/StatCard";
 import StatusBadge from "../components/StatusBadge";
-import { mediaUrl } from "../config/api";
 import { useAuth } from "../context/AuthContext";
 import api from "../services/api";
-import { uploadFile } from "../services/upload";
-import { createWatermarkedAttendancePhoto } from "../utils/attendancePhoto";
+import { submitAttendance } from "../services/attendance";
 import { ATTENDANCE_SITES } from "../utils/attendanceSites";
-import { getDeviceInfo } from "../utils/device";
 import { formatDate, formatTime } from "../utils/formatters";
 import { getAttendanceLocationPayload, googleMapsUrl } from "../utils/geolocation";
 import { attendanceShift } from "../utils/shifts";
@@ -80,31 +78,23 @@ export default function EmployeeDashboard({ title = "Employee Dashboard" }) {
     setLoadingAction(true);
     try {
       const location = await refreshLocation(false);
-      const payload = {
-        employee_id: user?.employeeId,
-        accuracy: location.accuracy,
-        latitude: location.latitude,
-        locationStatus: location.locationStatus,
-        longitude: location.longitude
-      };
-      if (isCheckIn) {
-        const watermarkedPhoto = await createWatermarkedAttendancePhoto(attendancePhoto.file, {
-          capturedAt: attendancePhoto.capturedAt,
-          site: attendanceSite
-        });
-        const uploaded = await uploadFile(watermarkedPhoto, "image");
-        payload.attendancePhoto = uploaded.url;
-        payload.attendancePhotoDevice = getDeviceInfo().deviceName;
-        payload.attendancePhotoCapturedAt = new Date(attendancePhoto.capturedAt).toISOString();
-        payload.attendanceSite = attendanceSite;
-      }
-      await api.post(path, payload);
+      await submitAttendance({
+        attendancePhoto,
+        attendanceSite,
+        employeeId: user?.employeeId,
+        location,
+        path
+      });
       if (isCheckIn) {
         setAttendancePhoto(null);
         setAttendanceSite("");
       }
       toast.success(location.locationStatus === "Captured" ? successMessage : location.locationStatus === "Permission denied" ? "Attendance marked, but location permission was not allowed." : locationUnavailableMessage);
-      await load();
+      try {
+        await load();
+      } catch {
+        toast.error("Attendance was saved, but the dashboard could not refresh. Refresh the page to try again.");
+      }
     } catch (error) {
       toast.error(error.message);
     } finally {
@@ -178,7 +168,7 @@ export default function EmployeeDashboard({ title = "Employee Dashboard" }) {
               <span className="form-label">Attendance Site</span>
               <select
                 className="form-input"
-                disabled={loadingAction || Boolean(dashboard.attendance?.checkIn)}
+                disabled={loadingAction || Boolean(dashboard.attendance?.checkIn) || Boolean(attendancePhoto?.file)}
                 value={attendanceSite}
                 onChange={(event) => setAttendanceSite(event.target.value)}
               >
@@ -192,9 +182,11 @@ export default function EmployeeDashboard({ title = "Employee Dashboard" }) {
                 Required for check-in. Site, date, time, and device are added to the image.
               </p>
               <AttendanceCamera
-                disabled={loadingAction || Boolean(dashboard.attendance?.checkIn)}
+                disabled={loadingAction || Boolean(dashboard.attendance?.checkIn) || !attendanceSite}
+                location={locationState.coordinates || { locationStatus: locationState.status }}
                 photo={attendancePhoto}
                 onChange={setAttendancePhoto}
+                site={attendanceSite}
               />
             </div>
           </div>
@@ -265,9 +257,7 @@ export default function EmployeeDashboard({ title = "Employee Dashboard" }) {
                     </td>
                     <td className="table-cell">
                       {item.checkInPhoto ? (
-                        <a className="inline-flex items-center gap-1 text-xs font-bold text-slate-900" href={mediaUrl(item.checkInPhoto)} target="_blank" rel="noreferrer">
-                          View Photo <ExternalLink className="h-3 w-3" aria-hidden="true" />
-                        </a>
+                        <AttendancePhotoLink attendanceId={item._id} />
                       ) : (
                         "-"
                       )}
@@ -323,9 +313,7 @@ export default function EmployeeDashboard({ title = "Employee Dashboard" }) {
                   <p className="text-xs text-slate-500">{item.checkInLatitude ?? "-"}, {item.checkInLongitude ?? "-"}</p>
                 </div>
                 {item.checkInPhoto ? (
-                  <a className="mt-3 inline-flex items-center gap-1 text-xs font-bold text-slate-900" href={mediaUrl(item.checkInPhoto)} target="_blank" rel="noreferrer">
-                    View Photo <ExternalLink className="h-3 w-3" aria-hidden="true" />
-                  </a>
+                  <AttendancePhotoLink attendanceId={item._id} className="mt-3" />
                 ) : null}
               </article>
             ))}

@@ -1,8 +1,9 @@
-const cors = require("cors");
 const dotenv = require("dotenv");
+dotenv.config();
+
+const cors = require("cors");
 const express = require("express");
 const path = require("path");
-const rateLimit = require("express-rate-limit");
 const helmet = require("helmet");
 const morgan = require("morgan");
 const mongoose = require("mongoose");
@@ -19,8 +20,21 @@ const sqlErrorHandler = require("./sql/middleware/error");
 const mountSqlApi = require("./sql/mountSqlApi");
 const mountLocalDevApi = require("./utils/localDevApi");
 const { ensureDefaultAdmin } = require("./utils/defaultAdmin");
+const ensureMongoIndexes = require("./utils/mongoIndexes");
+const {
+  generalApiLimiter,
+  loginLimiter,
+  passwordResetLimiter,
+  uploadLimiter
+} = require("./middleware/rateLimits");
+const {
+  initializeMonitoring,
+  isMonitoringEnabled,
+  setupMonitoringErrorHandler
+} = require("./utils/monitoring");
+const { useCloudStorage } = require("./utils/uploadStorage");
 
-dotenv.config();
+initializeMonitoring();
 
 const app = express();
 app.disable("x-powered-by");
@@ -60,14 +74,6 @@ app.use(
   })
 );
 app.use(
-  rateLimit({
-    windowMs: Number(process.env.RATE_LIMIT_WINDOW_MS || 15 * 60 * 1000),
-    max: Number(process.env.RATE_LIMIT_MAX || 300),
-    standardHeaders: true,
-    legacyHeaders: false
-  })
-);
-app.use(
   cors({
     origin(origin, callback) {
       if (!origin) {
@@ -91,7 +97,10 @@ app.use(
 );
 app.use(express.json({ limit: "2mb" }));
 app.use(express.urlencoded({ extended: true }));
-app.use("/uploads", express.static(path.join(__dirname, "uploads")));
+app.use(
+  "/uploads",
+  express.static(process.env.UPLOAD_ROOT ? path.resolve(process.env.UPLOAD_ROOT) : path.join(__dirname, "uploads"))
+);
 
 if (process.env.NODE_ENV !== "production") {
   app.use(morgan("dev"));
@@ -100,9 +109,12 @@ if (process.env.NODE_ENV !== "production") {
 app.get("/api/health", (req, res) => {
   const mongoReadyState = mongoose.connection.readyState;
   const mongoStatus = ["disconnected", "connected", "connecting", "disconnecting"][mongoReadyState] || "unknown";
+  const databaseReady =
+    runtimeState.database.mode === "local-json" ||
+    runtimeState.database.status === "connected";
 
   res.json({
-    status: "ok",
+    status: databaseReady ? "ok" : "degraded",
     app: "Razk Automation Employee Management System",
     server: {
       status: "running",
@@ -110,7 +122,9 @@ app.get("/api/health", (req, res) => {
       uptimeSeconds: Math.round(process.uptime())
     },
     database: {
-      ...runtimeState.database,
+      mode: runtimeState.database.mode,
+      ready: databaseReady,
+      status: runtimeState.database.status,
       mongoose: mongoStatus
     },
     environment: {
@@ -120,9 +134,19 @@ app.get("/api/health", (req, res) => {
       localStoreAllowed: startupConfig.allowLocalStore,
       mobileWebViewOrigins: startupConfig.mobileWebViewOrigins
     },
+    services: {
+      attendanceImageStorage: useCloudStorage() ? "cloudinary" : "local-development",
+      monitoring: isMonitoringEnabled() ? "sentry" : "disabled"
+    },
     timestamp: new Date().toISOString()
   });
 });
+
+app.use("/api/auth/login", loginLimiter);
+app.use("/api/auth/forgot-password", passwordResetLimiter);
+app.use("/api/auth/reset-password", passwordResetLimiter);
+app.use("/api/uploads", uploadLimiter);
+app.use("/api", generalApiLimiter);
 
 const mountMongoApi = () => {
   app.use("/api/auth", require("./routes/authRoutes"));
@@ -164,8 +188,9 @@ const startServer = async () => {
       runtimeState.database = { mode: "mongodb", status: "connecting", message: "Connecting to MongoDB" };
       await connectDB();
       runtimeState.database = { mode: "mongodb", status: "connected", message: "MongoDB connection is active" };
+      await ensureMongoIndexes();
       if (await ensureDefaultAdmin()) {
-        console.log("Default admin created: admin@razkautomation.com / Admin@12345");
+        console.warn("Default admin account was created. Change its password immediately.");
       }
       mountMongoApi();
     } catch (error) {
@@ -186,6 +211,7 @@ const startServer = async () => {
   }
 
   app.use(notFound);
+  setupMonitoringErrorHandler(app);
   app.use(startupConfig.useSql ? sqlErrorHandler : errorHandler);
 
   const port = startupConfig.port;
