@@ -1,4 +1,7 @@
 const multer = require("multer");
+const { createCloudinaryStreamStorage } = require("../storage/cloudinaryStreamStorage");
+const { createLocalDiskStorage } = require("../storage/localDiskStorage");
+const { useCloudStorage } = require("../utils/uploadStorage");
 
 const imageMimeTypes = new Set([
   "image/jpeg",
@@ -20,8 +23,21 @@ const uploadValidationError = (message) => {
   return error;
 };
 
+const cloudinaryStorage = createCloudinaryStreamStorage();
+const localStorage = createLocalDiskStorage();
+const storage = {
+  _handleFile(req, file, callback) {
+    const selectedStorage = useCloudStorage() ? cloudinaryStorage : localStorage;
+    selectedStorage._handleFile(req, file, callback);
+  },
+  _removeFile(req, file, callback) {
+    const selectedStorage = file?.provider === "cloudinary" ? cloudinaryStorage : localStorage;
+    selectedStorage._removeFile(req, file, callback);
+  }
+};
+
 const upload = multer({
-  storage: multer.memoryStorage(),
+  storage,
   limits: {
     fileSize: Number(process.env.MAX_UPLOAD_BYTES || 5 * 1024 * 1024)
   },

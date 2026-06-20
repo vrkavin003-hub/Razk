@@ -38,6 +38,7 @@ export default function AttendancePage() {
   const [attendancePhoto, setAttendancePhoto] = useState(null);
   const [attendanceSite, setAttendanceSite] = useState("");
   const [loadingAction, setLoadingAction] = useState(false);
+  const [actionStage, setActionStage] = useState("");
 
   const load = async () => {
     if (isManager) {
@@ -93,6 +94,7 @@ export default function AttendancePage() {
     }
 
     setLoadingAction(true);
+    setActionStage("Checking location...");
     try {
       const location = await refreshLocation(false);
       await submitAttendance({
@@ -100,7 +102,8 @@ export default function AttendancePage() {
         attendanceSite,
         employeeId: user?.employeeId,
         location,
-        path
+        path,
+        onStage: setActionStage
       });
       if (isCheckIn) {
         setAttendancePhoto(null);
@@ -116,6 +119,7 @@ export default function AttendancePage() {
       toast.error(error.message);
     } finally {
       setLoadingAction(false);
+      setActionStage("");
     }
   };
 
@@ -191,6 +195,9 @@ export default function AttendancePage() {
               {locationState.loading ? "Checking GPS..." : "Refresh Location"}
             </Button>
           </div>
+          {loadingAction && actionStage ? (
+            <p className="mt-2 text-xs font-semibold text-slate-500 dark:text-slate-300">{actionStage}</p>
+          ) : null}
           <div className="mt-5 grid gap-4 rounded-lg border border-slate-200 bg-slate-50 p-4 md:grid-cols-[220px_1fr] dark:border-slate-700 dark:bg-slate-900">
             <label className="space-y-1.5">
               <span className="form-label">Attendance Site</span>

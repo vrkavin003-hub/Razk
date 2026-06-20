@@ -12,6 +12,7 @@ const errorHandler = (err, req, res, next) => {
   const statusCode =
     err.statusCode ||
     (isDuplicateKeyError ? 409 : 0) ||
+    (err.code === "LIMIT_FILE_SIZE" ? 413 : 0) ||
     (isUploadLimitError ? 400 : 0) ||
     (res.statusCode && res.statusCode !== 200 ? res.statusCode : 500);
   const duplicateField = err.code === 11000 ? Object.keys(err.keyValue || {})[0] : null;

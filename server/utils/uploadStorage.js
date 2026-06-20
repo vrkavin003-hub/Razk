@@ -1,4 +1,3 @@
-const crypto = require("crypto");
 const fs = require("fs");
 const path = require("path");
 const {
@@ -7,9 +6,6 @@ const {
   isCloudinaryConfigured
 } = require("../config/cloudinary");
 
-const uploadRoot = process.env.UPLOAD_ROOT
-  ? path.resolve(process.env.UPLOAD_ROOT)
-  : path.join(__dirname, "..", "uploads");
 const cloudRoot = "razk-hrms";
 
 const safeSegment = (value, fallback = "unknown") =>
@@ -22,104 +18,21 @@ const storageOwner = (userId) => safeSegment(userId);
 const storageFolder = (folder) => safeSegment(folder, "files");
 const cloudPrefix = ({ folder, userId }) => `${cloudRoot}/${storageFolder(folder)}/${storageOwner(userId)}/`;
 const localPrefix = ({ folder, userId }) => `/uploads/${storageFolder(folder)}/${storageOwner(userId)}/`;
+const getUploadRoot = () => process.env.UPLOAD_ROOT
+  ? path.resolve(process.env.UPLOAD_ROOT)
+  : path.join(__dirname, "..", "uploads");
 
 const useCloudStorage = () => isCloudinaryConfigured();
-
-const validateFileContent = (file) => {
-  const bytes = file?.buffer;
-  const valid =
-    (file?.mimetype === "image/jpeg" &&
-      bytes?.length >= 3 &&
-      bytes[0] === 0xff &&
-      bytes[1] === 0xd8 &&
-      bytes[2] === 0xff) ||
-    (file?.mimetype === "image/png" &&
-      bytes?.length >= 8 &&
-      bytes.subarray(0, 8).equals(Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]))) ||
-    (file?.mimetype === "image/webp" &&
-      bytes?.length >= 12 &&
-      bytes.subarray(0, 4).toString("ascii") === "RIFF" &&
-      bytes.subarray(8, 12).toString("ascii") === "WEBP") ||
-    (file?.mimetype === "image/gif" &&
-      bytes?.length >= 6 &&
-      ["GIF87a", "GIF89a"].includes(bytes.subarray(0, 6).toString("ascii"))) ||
-    (file?.mimetype === "application/pdf" &&
-      bytes?.length >= 5 &&
-      bytes.subarray(0, 5).toString("ascii") === "%PDF-") ||
-    (file?.mimetype === "application/msword" &&
-      bytes?.length >= 8 &&
-      bytes.subarray(0, 8).equals(Buffer.from([0xd0, 0xcf, 0x11, 0xe0, 0xa1, 0xb1, 0x1a, 0xe1]))) ||
-    (file?.mimetype === "application/vnd.openxmlformats-officedocument.wordprocessingml.document" &&
-      bytes?.length >= 4 &&
-      bytes.subarray(0, 4).equals(Buffer.from([0x50, 0x4b, 0x03, 0x04])));
-
-  if (!valid) {
-    const error = new Error("Uploaded file content does not match its declared type");
-    error.statusCode = 400;
-    throw error;
-  }
-};
-
-const uploadToCloudinary = ({ file, folder, userId }) =>
-  new Promise((resolve, reject) => {
-    const client = getCloudinaryClient();
-    const resourceType = file.mimetype.startsWith("image/") ? "image" : "raw";
-    const rawExtension = resourceType === "raw" ? path.extname(safeFilename(file.originalname)).toLowerCase() : "";
-    const publicId = `${cloudPrefix({ folder, userId })}${crypto.randomUUID()}${rawExtension}`;
-    const stream = client.uploader.upload_stream(
-      {
-        public_id: publicId,
-        resource_type: resourceType,
-        overwrite: false
-      },
-      (error, result) => {
-        if (error) {
-          reject(error);
-          return;
-        }
-        resolve({
-          filename: result.public_id.split("/").pop(),
-          originalName: file.originalname,
-          mimeType: file.mimetype,
-          size: file.size,
-          url: result.secure_url,
-          publicId: result.public_id,
-          provider: "cloudinary",
-          resourceType
-        });
-      }
-    );
-    stream.end(file.buffer);
-  });
-
-const uploadToLocalStorage = async ({ file, folder, userId }) => {
-  const owner = storageOwner(userId);
-  const normalizedFolder = storageFolder(folder);
-  const directory = path.join(uploadRoot, normalizedFolder, owner);
-  await fs.promises.mkdir(directory, { recursive: true });
-  const filename = `${Date.now()}-${crypto.randomUUID()}-${safeFilename(file.originalname)}`;
-  const absolutePath = path.join(directory, filename);
-  await fs.promises.writeFile(absolutePath, file.buffer);
-  const publicId = `${localPrefix({ folder: normalizedFolder, userId: owner })}${filename}`;
-
-  return {
-    filename,
-    originalName: file.originalname,
-    mimeType: file.mimetype,
-    size: file.size,
-    url: publicId,
-    publicId,
-    provider: "local",
-    resourceType: file.mimetype.startsWith("image/") ? "image" : "raw"
-  };
-};
-
-const storeUploadedFile = ({ file, folder, userId }) => {
-  validateFileContent(file);
-  return useCloudStorage()
-    ? uploadToCloudinary({ file, folder, userId })
-    : uploadToLocalStorage({ file, folder, userId });
-};
+const toStoredFileResponse = (file = {}) => ({
+  filename: file.filename,
+  originalName: file.originalName || file.originalname,
+  mimeType: file.mimeType || file.mimetype,
+  size: file.size,
+  url: file.url,
+  provider: file.provider,
+  publicId: file.publicId,
+  resourceType: file.resourceType
+});
 
 const deleteCloudinaryAsset = async ({ publicId, resourceType }) => {
   const client = getCloudinaryClient();
@@ -136,8 +49,8 @@ const deleteLocalAsset = async ({ publicId }) => {
 
 const resolveLocalUploadPath = (publicId) => {
   const relativePath = String(publicId || "").replace(/^\/uploads\//, "");
-  const absolutePath = path.resolve(uploadRoot, relativePath);
-  const resolvedRoot = path.resolve(uploadRoot);
+  const absolutePath = path.resolve(getUploadRoot(), relativePath);
+  const resolvedRoot = path.resolve(getUploadRoot());
   if (!absolutePath.startsWith(`${resolvedRoot}${path.sep}`)) throw new Error("Invalid local upload path");
   return absolutePath;
 };
@@ -191,9 +104,15 @@ const isAllowedAttendancePhotoUrl = ({ provider, publicId, url: value, userId })
 };
 
 module.exports = {
+  cloudPrefix,
   deleteStoredFile,
+  getUploadRoot,
   isAllowedAttendancePhotoUrl,
+  localPrefix,
   resolveLocalUploadPath,
-  storeUploadedFile,
+  safeFilename,
+  storageFolder,
+  storageOwner,
+  toStoredFileResponse,
   useCloudStorage
 };

@@ -1,6 +1,5 @@
 const asyncHandler = require("../utils/asyncHandler");
-const { logError, logInfo } = require("../utils/structuredLogger");
-const { deleteStoredFile, storeUploadedFile } = require("../utils/uploadStorage");
+const { deleteStoredFile, toStoredFileResponse } = require("../utils/uploadStorage");
 const Attendance = require("../models/Attendance");
 
 const uploadFile = asyncHandler(async (req, res) => {
@@ -9,27 +8,7 @@ const uploadFile = asyncHandler(async (req, res) => {
     throw new Error("File is required");
   }
 
-  try {
-    const storedFile = await storeUploadedFile({
-      file: req.file,
-      folder: req.uploadFolder || "images",
-      userId: req.user._id
-    });
-    logInfo("upload_succeeded", {
-      folder: req.uploadFolder || "images",
-      provider: storedFile.provider,
-      size: storedFile.size,
-      userId: String(req.user._id)
-    });
-    res.status(201).json({ file: storedFile });
-  } catch (error) {
-    logError("upload_failed", {
-      folder: req.uploadFolder || "images",
-      message: error.message,
-      userId: String(req.user._id)
-    });
-    throw error;
-  }
+  res.status(201).json({ file: toStoredFileResponse(req.file) });
 });
 
 const deleteUploadedFile = asyncHandler(async (req, res) => {

@@ -10,7 +10,7 @@ const { normalizeAttendanceSite } = require("./attendanceSites");
 const { normalizeDeviceId, normalizeDeviceName } = require("./deviceApproval");
 const { generateToken, hashDeviceId, verifyToken } = require("./authToken");
 const { logError, logInfo, logWarn } = require("./structuredLogger");
-const { deleteStoredFile, isAllowedAttendancePhotoUrl, storeUploadedFile } = require("./uploadStorage");
+const { deleteStoredFile, isAllowedAttendancePhotoUrl, toStoredFileResponse } = require("./uploadStorage");
 const { canViewAttendancePhoto, sendAttendancePhoto } = require("./attendancePhotoAccess");
 const { upload } = require("../middleware/uploadMiddleware");
 const {
@@ -647,8 +647,7 @@ const mountLocalDevApi = (app) => {
     upload.single("file"),
     asyncRoute(async (req, res) => {
       if (!req.file) return json(res, { message: "File is required" }, 400);
-      const file = await storeUploadedFile({ file: req.file, folder: "images", userId: req.user._id });
-      return json(res, { file }, 201);
+      return json(res, { file: toStoredFileResponse(req.file) }, 201);
     })
   );
 
@@ -662,8 +661,7 @@ const mountLocalDevApi = (app) => {
     upload.single("file"),
     asyncRoute(async (req, res) => {
       if (!req.file) return json(res, { message: "File is required" }, 400);
-      const file = await storeUploadedFile({ file: req.file, folder: "documents", userId: req.user._id });
-      return json(res, { file }, 201);
+      return json(res, { file: toStoredFileResponse(req.file) }, 201);
     })
   );
 

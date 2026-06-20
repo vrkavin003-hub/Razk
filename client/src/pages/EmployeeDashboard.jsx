@@ -40,6 +40,7 @@ export default function EmployeeDashboard({ title = "Employee Dashboard" }) {
   const [attendancePhoto, setAttendancePhoto] = useState(null);
   const [attendanceSite, setAttendanceSite] = useState("");
   const [loadingAction, setLoadingAction] = useState(false);
+  const [actionStage, setActionStage] = useState("");
 
   const load = async () => {
     const { data } = await api.get("/dashboard/employee");
@@ -76,6 +77,7 @@ export default function EmployeeDashboard({ title = "Employee Dashboard" }) {
     }
 
     setLoadingAction(true);
+    setActionStage("Checking location...");
     try {
       const location = await refreshLocation(false);
       await submitAttendance({
@@ -83,7 +85,8 @@ export default function EmployeeDashboard({ title = "Employee Dashboard" }) {
         attendanceSite,
         employeeId: user?.employeeId,
         location,
-        path
+        path,
+        onStage: setActionStage
       });
       if (isCheckIn) {
         setAttendancePhoto(null);
@@ -99,6 +102,7 @@ export default function EmployeeDashboard({ title = "Employee Dashboard" }) {
       toast.error(error.message);
     } finally {
       setLoadingAction(false);
+      setActionStage("");
     }
   };
 
@@ -163,6 +167,9 @@ export default function EmployeeDashboard({ title = "Employee Dashboard" }) {
               {locationState.loading ? "Checking GPS..." : "Refresh Location"}
             </Button>
           </div>
+          {loadingAction && actionStage ? (
+            <p className="mt-2 text-xs font-semibold text-slate-500">{actionStage}</p>
+          ) : null}
           <div className="mt-5 grid gap-4 rounded-lg border border-slate-200 bg-slate-50 p-4 md:grid-cols-[220px_1fr]">
             <label className="space-y-1.5">
               <span className="form-label">Attendance Site</span>

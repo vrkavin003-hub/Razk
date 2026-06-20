@@ -4,6 +4,9 @@ import { attendanceWatermarkLines } from "../utils/attendancePhoto";
 import { getDeviceInfo } from "../utils/device";
 import Button from "./Button";
 
+const MAX_CAPTURE_DIMENSION = 1280;
+const CAMERA_JPEG_QUALITY = 0.82;
+
 const canvasFile = (canvas) =>
   new Promise((resolve, reject) => {
     canvas.toBlob(
@@ -15,7 +18,7 @@ const canvasFile = (canvas) =>
         resolve(new File([blob], `attendance-capture-${Date.now()}.jpg`, { type: "image/jpeg" }));
       },
       "image/jpeg",
-      0.9
+      CAMERA_JPEG_QUALITY
     );
   });
 
@@ -95,8 +98,9 @@ export default function AttendanceCamera({
     setCapturing(true);
     try {
       const canvas = document.createElement("canvas");
-      canvas.width = video.videoWidth;
-      canvas.height = video.videoHeight;
+      const scale = Math.min(1, MAX_CAPTURE_DIMENSION / Math.max(video.videoWidth, video.videoHeight));
+      canvas.width = Math.round(video.videoWidth * scale);
+      canvas.height = Math.round(video.videoHeight * scale);
       const context = canvas.getContext("2d");
       if (!context) throw new Error("Unable to prepare camera capture");
       context.drawImage(video, 0, 0, canvas.width, canvas.height);

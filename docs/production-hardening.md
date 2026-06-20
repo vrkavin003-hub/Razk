@@ -29,6 +29,7 @@ MONGO_MIN_POOL_SIZE=2
 MONGO_SERVER_SELECTION_TIMEOUT_MS=3000
 MONGO_CREATE_INDEXES=true
 MAX_UPLOAD_BYTES=5242880
+UPLOAD_TIMEOUT_MS=30000
 ```
 
 `CLOUDINARY_API_SECRET`, `JWT_SECRET`, `MONGO_URI`, and `SENTRY_DSN` are backend-only. Do not create `VITE_` variables for them.
@@ -52,7 +53,7 @@ The server refuses local JSON fallback in production and fails startup when `MON
 1. Create a Cloudinary product environment dedicated to Razk production.
 2. Copy Cloud name, API key, and API secret into the Render variables above.
 3. Keep unsigned browser uploads disabled; all uploads pass through the authenticated backend.
-4. The backend stores assets under `razk-hrms/<type>/<user-id>/`, validates size, declared MIME type, and file signatures, and returns HTTPS URLs.
+4. The backend streams authenticated multipart uploads directly to Cloudinary under `razk-hrms/<type>/<user-id>/`, validates size, extension, declared MIME type, and initial file signatures, and returns HTTPS URLs without buffering the complete file in Node memory.
 5. Configure Cloudinary retention/backup policy appropriate to attendance evidence. Cloudinary storage and bandwidth are metered.
 
 Local filesystem uploads remain available only when running outside production without Cloudinary credentials.

@@ -16,18 +16,21 @@ export const submitAttendance = async ({
   attendanceSite,
   employeeId,
   location,
-  path
+  path,
+  onStage = () => {}
 }) => {
   const isCheckIn = path.includes("check-in");
   let uploadedPhoto = null;
   const payload = baseAttendancePayload({ employeeId, location });
 
   if (isCheckIn) {
+    onStage("Preparing photo...");
     const watermarkedPhoto = await createWatermarkedAttendancePhoto(attendancePhoto.file, {
       capturedAt: attendancePhoto.capturedAt,
       location: attendancePhoto.location || location,
       site: attendanceSite
     });
+    onStage("Uploading photo...");
     uploadedPhoto = await uploadFile(watermarkedPhoto, "image");
     payload.attendancePhoto = uploadedPhoto.url;
     payload.attendancePhotoDevice = getDeviceInfo().deviceName;
@@ -39,6 +42,7 @@ export const submitAttendance = async ({
   }
 
   try {
+    onStage("Marking attendance...");
     return await api.post(path, payload);
   } catch (error) {
     if (uploadedPhoto) {

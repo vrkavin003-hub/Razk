@@ -11,6 +11,7 @@
     "test:attendance": "node tests/integration/attendance-local.js",
     "test:attendance-photo": "node tests/unit/attendance-photo.mjs",
     "test:device-persistence": "node tests/unit/device-persistence.mjs",
+    "test:upload-streaming": "node tests/unit/upload-streaming.js",
     "load:inspect": "k6 inspect -e K6_VALIDATE_ONLY=true tests/load/razk-50-users.js",
     "load:test": "k6 run tests/load/razk-50-users.js",
     "seed": "npm --prefix server run seed",

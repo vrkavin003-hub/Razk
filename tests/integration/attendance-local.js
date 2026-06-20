@@ -41,6 +41,13 @@ server.stdout.on("data", (chunk) => serverLogs.push(chunk.toString()));
 server.stderr.on("data", (chunk) => serverLogs.push(chunk.toString()));
 
 const wait = (milliseconds) => new Promise((resolve) => setTimeout(resolve, milliseconds));
+const filesUnder = (directory) => {
+  if (!fs.existsSync(directory)) return [];
+  return fs.readdirSync(directory, { withFileTypes: true }).flatMap((entry) => {
+    const fullPath = path.join(directory, entry.name);
+    return entry.isDirectory() ? filesUnder(fullPath) : [fullPath];
+  });
+};
 
 const waitForServer = async () => {
   const deadline = Date.now() + 15000;
@@ -112,6 +119,16 @@ const uploadImage = async (session, filename) => {
   assert.match(data.file.url, /^\/uploads\/images\//);
   assert.equal(data.file.publicId, data.file.url);
   return data.file;
+};
+
+const uploadRawImage = async (session, { bytes, expected, filename, type = "image/jpeg" }) => {
+  const form = new FormData();
+  form.append("file", new Blob([bytes], { type }), filename);
+  return request("POST", "/uploads/image", {
+    ...auth(session),
+    body: form,
+    expected
+  });
 };
 
 const requestAndApproveDevice = async ({ employeeId, employeePassword, hr, deviceId }) => {
@@ -205,6 +222,22 @@ const run = async () => {
     employeePassword: "Employee@123",
     hr
   });
+
+  await uploadRawImage(refreshedEmployee, {
+    bytes: Buffer.from("not-an-image"),
+    expected: 400,
+    filename: "invalid-attendance.jpg"
+  });
+  const oversizedJpeg = Buffer.alloc(5 * 1024 * 1024 + 1);
+  oversizedJpeg[0] = 0xff;
+  oversizedJpeg[1] = 0xd8;
+  oversizedJpeg[2] = 0xff;
+  await uploadRawImage(refreshedEmployee, {
+    bytes: oversizedJpeg,
+    expected: 413,
+    filename: "oversized-attendance.jpg"
+  });
+  assert.equal(filesUnder(uploadRoot).length, 0, "Rejected uploads must not leave local orphan files");
 
   await request("POST", "/attendance/check-out", {
     ...auth(refreshedEmployee),

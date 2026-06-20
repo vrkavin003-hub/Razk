@@ -1,6 +1,7 @@
 import { getDeviceInfo } from "./device.js";
 
 const MAX_DIMENSION = 1280;
+const JPEG_QUALITY = 0.8;
 export const ATTENDANCE_TIME_ZONE = "Asia/Kolkata";
 
 const loadImage = (file) =>
@@ -123,7 +124,7 @@ export const createWatermarkedAttendancePhoto = async (
         resolve(new File([blob], `attendance-${Date.now()}.jpg`, { type: "image/jpeg" }));
       },
       "image/jpeg",
-      0.82
+      JPEG_QUALITY
     );
   });
 };
