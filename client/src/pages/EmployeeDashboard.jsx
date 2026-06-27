@@ -3,6 +3,7 @@ import { useEffect, useState } from "react";
 import toast from "react-hot-toast";
 import Button from "../components/Button";
 import AttendanceCamera from "../components/AttendanceCamera";
+import AnnouncementMessage from "../components/AnnouncementMessage";
 import AttendancePhotoLink from "../components/AttendancePhotoLink";
 import DateTimeDisplay from "../components/DateTimeDisplay";
 import EmptyState from "../components/EmptyState";
@@ -385,7 +386,7 @@ export default function EmployeeDashboard({ title = "Employee Dashboard" }) {
           {(dashboard.announcements || []).map((announcement) => (
             <article className="rounded-lg border border-slate-200 bg-slate-50 p-4" key={announcement._id}>
               <p className="text-sm font-bold text-slate-950">{announcement.title}</p>
-              <p className="mt-2 text-sm text-slate-600">{announcement.message}</p>
+              <AnnouncementMessage className="mt-2 text-sm text-slate-600" message={announcement.message} />
             </article>
           ))}
         </div>

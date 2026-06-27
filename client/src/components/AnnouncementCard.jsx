@@ -1,4 +1,5 @@
 import { Megaphone, Trash2 } from "lucide-react";
+import AnnouncementMessage from "./AnnouncementMessage";
 import Button from "./Button";
 import DateTimeDisplay from "./DateTimeDisplay";
 
@@ -21,7 +22,10 @@ export default function AnnouncementCard({ announcement, onDelete }) {
           <p className="mt-1 text-xs font-bold uppercase tracking-wide text-slate-500 dark:text-slate-300">
             {announcement.targetRole} | <DateTimeDisplay value={announcement.createdAt} />
           </p>
-          <p className="mt-3 text-sm leading-6 text-slate-600 dark:text-slate-100">{announcement.message}</p>
+          <AnnouncementMessage
+            className="mt-3 text-sm leading-6 text-slate-600 dark:text-slate-100"
+            message={announcement.message}
+          />
           {announcement.createdBy?.name ? (
             <p className="mt-3 text-xs font-semibold text-slate-500 dark:text-slate-300">
               By {announcement.createdBy.name}
