@@ -1,4 +1,4 @@
-const CACHE_NAME = "razk-hrms-shell-v2";
+const CACHE_NAME = "razk-hrms-shell-v3";
 const APP_SHELL = ["/", "/login", "/manifest.webmanifest", "/pwa-icon-192.png", "/pwa-icon-512.png", "/razk-logo.jpeg"];
 
 self.addEventListener("install", (event) => {
