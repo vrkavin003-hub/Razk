@@ -28,6 +28,7 @@ export default function LeaveRequests() {
   const { user } = useAuth();
   const isManager = ["admin", "hr"].includes(user?.role);
   const [leaves, setLeaves] = useState(null);
+  const [loadError, setLoadError] = useState("");
   const [form, setForm] = useState(defaultForm);
   const [balance, setBalance] = useState(null);
   const [balances, setBalances] = useState({});
@@ -37,10 +38,20 @@ export default function LeaveRequests() {
 
   const load = async () => {
     const endpoint = isManager ? "/leave/all" : "/leave/my-requests";
-    const { data } = await api.get(endpoint);
-    setLeaves(data.leaves);
-    setBalance(data.balance || null);
-    setBalances(data.balances || {});
+    setLoadError("");
+    try {
+      const { data } = await api.get(endpoint, { timeout: 30000 });
+      setLeaves(Array.isArray(data.leaves) ? data.leaves : []);
+      setBalance(data.balance || null);
+      setBalances(data.balances || {});
+    } catch (error) {
+      const message = error.message || "Unable to load leave requests";
+      setLeaves([]);
+      setBalance(null);
+      setBalances({});
+      setLoadError(message);
+      toast.error(message);
+    }
   };
 
   useEffect(() => {
@@ -88,6 +99,15 @@ export default function LeaveRequests() {
         title="Leave Requests"
         description={isManager ? "Approve or reject employee leave requests." : "Submit leave and track approval status."}
       />
+      {loadError ? (
+        <section className="mb-6 panel p-5">
+          <p className="font-semibold text-slate-950">Unable to load leave requests</p>
+          <p className="mt-1 text-sm text-slate-600">{loadError}</p>
+          <Button className="mt-4" onClick={load} variant="secondary">
+            Retry
+          </Button>
+        </section>
+      ) : null}
       {!isManager ? (
         <>
         <section className="mb-6 grid gap-4 md:grid-cols-3">
@@ -169,18 +189,24 @@ export default function LeaveRequests() {
             <tbody>
               {leaves.map((leave) => {
                 const canDecide = canDecideRequest(leave, user);
+                const requester = leave.employee || {};
+                const requesterName = requester.name || leave.requesterName || user?.name || "-";
+                const requesterDepartment = requester.department || leave.requesterDepartment || user?.department || "";
+                const requesterEmployeeId = requester.employeeId || "";
+                const requesterPhoto = requester.profilePhoto || "";
+                const requesterBalance = balances[String(requester._id || "")];
                 return (
                 <tr key={leave._id}>
                   <td className="table-cell">
                     <div className="flex items-center gap-3">
-                      <UserAvatar name={leave.employee?.name || user?.name} photo={leave.employee?.profilePhoto || user?.profilePhoto} size="sm" />
+                      <UserAvatar name={requesterName} photo={requesterPhoto} size="sm" />
                       <div>
-                        <p className="font-semibold text-slate-950">{leave.employee?.name || user?.name || "-"}</p>
-                        <p className="text-xs text-slate-500">{leave.employee?.employeeId || user?.employeeId || ""}</p>
-                        <p className="text-xs text-slate-500">{leave.employee?.department || user?.department || ""}</p>
-                        {isManager && balances[String(leave.employee?._id || "")] ? (
+                        <p className="font-semibold text-slate-950">{requesterName}</p>
+                        <p className="text-xs text-slate-500">{requesterEmployeeId}</p>
+                        <p className="text-xs text-slate-500">{requesterDepartment}</p>
+                        {isManager && requesterBalance ? (
                           <p className="text-xs font-bold text-slate-900">
-                            Balance: {balances[String(leave.employee?._id || "")].remaining} days
+                            Balance: {requesterBalance.remaining} days
                           </p>
                         ) : null}
                       </div>
@@ -239,7 +265,7 @@ export default function LeaveRequests() {
         actionLabel={decision?.action === "approve" ? "Approve leave" : "Reject leave"}
         body={
           decision?.leave
-            ? `${decision.leave.employee?.name || user?.name || "Employee"} | ${decision.leave.leaveType} | ${formatDate(
+            ? `${decision.leave.employee?.name || decision.leave.requesterName || user?.name || "Employee"} | ${decision.leave.leaveType} | ${formatDate(
                 decision.leave.fromDate
               )} to ${formatDate(decision.leave.toDate)}`
             : ""

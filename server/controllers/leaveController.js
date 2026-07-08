@@ -1,5 +1,6 @@
 const LeaveRequest = require("../models/LeaveRequest");
 const asyncHandler = require("../utils/asyncHandler");
+const mongoose = require("mongoose");
 const {
   PAID_LEAVE_DAYS_PER_YEAR,
   dateRangeDays,
@@ -18,10 +19,20 @@ const {
   visibilityQueryForUser
 } = require("../utils/requestWorkflow");
 
+const safeEmployeeId = (employee) => {
+  const value = employee?._id || employee;
+  if (!value) return "";
+  const id = String(value);
+  return mongoose.isValidObjectId(id) ? id : "";
+};
+
 const approvedLeaveDaysForYear = async (employeeId, dateValue = new Date(), excludeId = null) => {
+  const safeId = safeEmployeeId(employeeId);
+  if (!safeId) return 0;
+
   const { from, to } = yearBounds(dateValue);
   const query = {
-    employee: employeeId,
+    employee: safeId,
     fromDate: { $lte: to },
     status: "Approved",
     toDate: { $gte: from }
@@ -104,13 +115,24 @@ const myLeaveRequests = asyncHandler(async (req, res) => {
 const allLeaveRequests = asyncHandler(async (req, res) => {
   const query = visibilityQueryForUser(req.user, req.query.status);
 
-  const leaves = await populateRequestQuery(LeaveRequest.find(query)).sort({ createdAt: -1 });
+  const leaves = await populateRequestQuery(LeaveRequest.find(query)).sort({ createdAt: -1 }).lean();
 
   const balances = {};
+  const balanceKeys = new Set();
+  const balanceJobs = [];
   for (const leave of leaves) {
-    const employeeId = String(leave.employee?._id || leave.employee);
-    if (employeeId && !balances[employeeId]) balances[employeeId] = await leaveBalanceForEmployee(employeeId, leave.fromDate);
+    const employeeId = safeEmployeeId(leave.employee);
+    const year = new Date(leave.fromDate || Date.now()).getFullYear();
+    const key = `${employeeId}:${year}`;
+    if (!employeeId || balanceKeys.has(key)) continue;
+    balanceKeys.add(key);
+    balanceJobs.push(
+      leaveBalanceForEmployee(employeeId, leave.fromDate).then((balance) => {
+        if (!balances[employeeId]) balances[employeeId] = balance;
+      })
+    );
   }
+  await Promise.all(balanceJobs);
 
   res.json({ balances, leaves });
 });
