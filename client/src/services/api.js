@@ -9,6 +9,9 @@ const api = axios.create({
   timeout: 20000
 });
 
+// Shorter, purpose-specific timeouts for critical startup/auth paths.
+api.defaults.timeout = 20000;
+
 const getSessionToken = () => {
   try {
     return sessionStorage.getItem("razk_token");

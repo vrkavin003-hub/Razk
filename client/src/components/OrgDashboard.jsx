@@ -24,6 +24,7 @@ import {
   YAxis
 } from "recharts";
 import api from "../services/api";
+import Button from "./Button";
 import Loading from "./Loading";
 import PageHeader from "./PageHeader";
 import StatCard from "./StatCard";
@@ -43,12 +44,35 @@ const tooltipStyle = {
 
 export default function OrgDashboard({ endpoint, title }) {
   const [dashboard, setDashboard] = useState(null);
+  const [loadError, setLoadError] = useState(null);
 
   useEffect(() => {
-    api.get(endpoint).then(({ data }) => setDashboard(data));
+    let active = true;
+    setLoadError(null);
+    api
+      .get(endpoint, { timeout: 20000 })
+      .then(({ data }) => {
+        if (active) setDashboard(data);
+      })
+      .catch((error) => {
+        if (active) setLoadError(error.message || "Unable to load the dashboard. Please try again.");
+      });
+    return () => {
+      active = false;
+    };
   }, [endpoint]);
 
-  if (!dashboard) return <Loading />;
+  if (!dashboard) {
+    if (loadError) {
+      return (
+        <div className="panel mx-auto mt-10 max-w-md p-6 text-center">
+          <p className="text-sm font-semibold text-slate-900 dark:text-slate-100">{loadError}</p>
+          <Button className="mt-4" onClick={() => window.location.reload()}>Retry</Button>
+        </div>
+      );
+    }
+    return <Loading />;
+  }
 
   const cards = dashboard.cards || {};
   const statCards = [

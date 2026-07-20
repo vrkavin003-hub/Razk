@@ -7,7 +7,7 @@ const path = require("path");
 const helmet = require("helmet");
 const morgan = require("morgan");
 const mongoose = require("mongoose");
-const connectDB = require("./config/db");
+const { connectDB, startPoolWarmup, stopPoolWarmup } = require("./config/db");
 const {
   getEnvironmentStatus,
   isAllowedClientOrigin,
@@ -219,6 +219,8 @@ const startServer = async () => {
     console.log(`Razk Automation HRMS API running on port ${port}`);
   });
 
+  startPoolWarmup();
+
   server.on("error", (error) => {
     console.error("HTTP server failed to start:", error.stack || error.message || error);
     process.exit(1);
@@ -226,6 +228,7 @@ const startServer = async () => {
 
   const shutdown = (signal) => {
     console.log(`Received ${signal}. Shutting down Razk Automation HRMS API...`);
+    stopPoolWarmup();
     server.close(() => process.exit(0));
   };
 

@@ -42,10 +42,16 @@ export default function EmployeeDashboard({ title = "Employee Dashboard" }) {
   const [attendanceSite, setAttendanceSite] = useState("");
   const [loadingAction, setLoadingAction] = useState(false);
   const [actionStage, setActionStage] = useState("");
+  const [loadError, setLoadError] = useState(null);
 
   const load = async () => {
-    const { data } = await api.get("/dashboard/employee");
-    setDashboard(data);
+    setLoadError(null);
+    try {
+      const { data } = await api.get("/dashboard/employee", { timeout: 20000 });
+      setDashboard(data);
+    } catch (error) {
+      setLoadError(error.message || "Unable to load your dashboard. Please try again.");
+    }
   };
 
   useEffect(() => {
@@ -81,6 +87,15 @@ export default function EmployeeDashboard({ title = "Employee Dashboard" }) {
     setActionStage("Checking location...");
     try {
       const location = await refreshLocation(false);
+      const hasValidLocation =
+        location &&
+        location.locationStatus === "Captured" &&
+        Number.isFinite(Number(location.latitude)) &&
+        Number.isFinite(Number(location.longitude));
+      if (!hasValidLocation) {
+        toast.error("Location is required to mark attendance. Please enable GPS and allow location access.");
+        return;
+      }
       await submitAttendance({
         attendancePhoto,
         attendanceSite,
@@ -122,7 +137,17 @@ export default function EmployeeDashboard({ title = "Employee Dashboard" }) {
     }
   };
 
-  if (!dashboard) return <Loading />;
+  if (!dashboard) {
+    if (loadError) {
+      return (
+        <div className="panel mx-auto mt-10 max-w-md p-6 text-center">
+          <p className="text-sm font-semibold text-slate-900 dark:text-slate-100">{loadError}</p>
+          <Button className="mt-4" onClick={() => load()}>Retry</Button>
+        </div>
+      );
+    }
+    return <Loading />;
+  }
 
   return (
     <>

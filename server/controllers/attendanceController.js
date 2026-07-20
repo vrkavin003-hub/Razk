@@ -52,6 +52,14 @@ const checkIn = asyncHandler(async (req, res) => {
 
     const now = new Date();
     const location = normalizeAttendanceLocation(req.body, now);
+    if (
+      location.latitude === null ||
+      location.longitude === null ||
+      location.locationStatus !== "Captured"
+    ) {
+      res.status(400);
+      throw new Error("Location is required to mark attendance. Please enable GPS and allow location access.");
+    }
     const attendanceSite = normalizeAttendanceSite(req.body.attendanceSite);
     if (!attendanceSite) {
       res.status(400);
@@ -171,6 +179,14 @@ const checkOut = asyncHandler(async (req, res) => {
 
   attendance.checkOut = now;
   const location = normalizeAttendanceLocation(req.body, now);
+  if (
+    location.latitude === null ||
+    location.longitude === null ||
+    location.locationStatus !== "Captured"
+  ) {
+    res.status(400);
+    throw new Error("Location is required to mark attendance. Please enable GPS and allow location access.");
+  }
   attendance.checkOutLatitude = location.latitude;
   attendance.checkOutLongitude = location.longitude;
   attendance.checkOutAccuracy = location.accuracy;
