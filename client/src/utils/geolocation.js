@@ -50,9 +50,10 @@ export const getBrowserLocation = () =>
 
 const ensureCapacitorLocationPermission = async () => {
   const permission = await Geolocation.checkPermissions();
+
   if (permission.location === "granted") return;
 
-  if (permission.location === "denied") {
+  if (permission.location === "denied" || permission.location === "denied_forever") {
     throw new Error(locationPermissionMessage);
   }
 
@@ -67,27 +68,38 @@ export const getCurrentLocation = async () => {
     return getBrowserLocation();
   }
 
+  await ensureCapacitorLocationPermission();
+
+  let position;
   try {
-    await ensureCapacitorLocationPermission();
-    const position = await Geolocation.getCurrentPosition({
+    position = await Geolocation.getCurrentPosition({
       enableHighAccuracy: true,
       maximumAge: 0,
       timeout: 15000
     });
-
-    return assertValidCoordinates({
-      accuracy: position.coords.accuracy,
-      latitude: position.coords.latitude,
-      longitude: position.coords.longitude
-    });
   } catch (error) {
     const message = String(error?.message || "");
-    if (/denied|permission/i.test(message)) throw new Error(locationPermissionMessage);
-    if (/location|disabled|unavailable/i.test(message)) {
+    if (/denied|permission|unavailable|disable/i.test(message)) {
       throw new Error("Location is turned off or unavailable.");
     }
     throw new Error(message || "Location could not be captured.");
   }
+
+  const postCheck = await Geolocation.checkPermissions();
+  if (postCheck.location !== "granted") {
+    throw new Error(locationPermissionMessage);
+  }
+
+  const coords = position?.coords;
+  if (!coords || coords.latitude == null || coords.longitude == null) {
+    throw new Error("Location could not be captured.");
+  }
+
+  return assertValidCoordinates({
+    accuracy: coords.accuracy,
+    latitude: coords.latitude,
+    longitude: coords.longitude
+  });
 };
 
 export const getAttendanceLocationPayload = async () => {

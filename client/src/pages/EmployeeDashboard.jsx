@@ -88,6 +88,12 @@ export default function EmployeeDashboard({ title = "Employee Dashboard" }) {
       setActionStage("");
       return;
     }
+    if (!location || location.latitude == null || location.longitude == null) {
+      toast.error("Unable to retrieve your current location. Please try again.");
+      setLoadingAction(false);
+      setActionStage("");
+      return;
+    }
     try {
       await submitAttendance({
         attendancePhoto,

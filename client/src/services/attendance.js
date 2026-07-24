@@ -19,6 +19,10 @@ export const submitAttendance = async ({
   path,
   onStage = () => {}
 }) => {
+  if (!location || location.latitude == null || location.longitude == null) {
+    throw new Error("Location permission is required to mark attendance.");
+  }
+
   const isCheckIn = path.includes("check-in");
   let uploadedPhoto = null;
   const payload = baseAttendancePayload({ employeeId, location });
