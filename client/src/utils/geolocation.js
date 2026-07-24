@@ -90,30 +90,13 @@ export const getCurrentLocation = async () => {
   }
 };
 
-export const attendanceLocationFromError = (error) => {
-  const message = String(error?.message || "");
-  const permissionDenied = /denied|permission|allow precise location/i.test(message);
-
-  return {
-    accuracy: null,
-    latitude: null,
-    locationError: message || "Location could not be captured.",
-    locationStatus: permissionDenied ? "Permission denied" : "Location not available",
-    longitude: null
-  };
-};
-
 export const getAttendanceLocationPayload = async () => {
-  try {
-    const coordinates = await getCurrentLocation();
-    return {
-      ...coordinates,
-      locationError: "",
-      locationStatus: "Captured"
-    };
-  } catch (error) {
-    return attendanceLocationFromError(error);
-  }
+  const coordinates = await getCurrentLocation();
+  return {
+    ...coordinates,
+    locationError: "",
+    locationStatus: "Captured"
+  };
 };
 
 export const googleMapsUrl = (latitude, longitude) => {

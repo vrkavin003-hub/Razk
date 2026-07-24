@@ -79,8 +79,16 @@ export default function EmployeeDashboard({ title = "Employee Dashboard" }) {
 
     setLoadingAction(true);
     setActionStage("Checking location...");
+    let location;
     try {
-      const location = await refreshLocation(false);
+      location = await refreshLocation(false);
+    } catch (error) {
+      toast.error(error.message || "Location permission is required to mark attendance.");
+      setLoadingAction(false);
+      setActionStage("");
+      return;
+    }
+    try {
       await submitAttendance({
         attendancePhoto,
         attendanceSite,
@@ -93,7 +101,7 @@ export default function EmployeeDashboard({ title = "Employee Dashboard" }) {
         setAttendancePhoto(null);
         setAttendanceSite("");
       }
-      toast.success(location.locationStatus === "Captured" ? successMessage : location.locationStatus === "Permission denied" ? "Attendance marked, but location permission was not allowed." : locationUnavailableMessage);
+      toast.success(successMessage);
       try {
         await load();
       } catch {
@@ -202,7 +210,7 @@ export default function EmployeeDashboard({ title = "Employee Dashboard" }) {
             <div className="surface-muted p-4">
               <p className="text-xs font-black uppercase text-slate-500">Location Status</p>
               <p className="mt-2 text-sm font-bold text-slate-950">{locationState.status}</p>
-              <p className="mt-1 text-xs text-slate-500">Attendance is allowed from any location.</p>
+              <p className="mt-1 text-xs text-slate-500">GPS location is required for check-in and check-out.</p>
             </div>
             <div className="surface-muted p-4">
               <p className="text-xs font-black uppercase text-slate-500">Coordinates</p>
@@ -221,7 +229,7 @@ export default function EmployeeDashboard({ title = "Employee Dashboard" }) {
               ) : (
                 <p className="mt-2 text-sm font-black text-slate-950">Location not available</p>
               )}
-              <p className="mt-1 text-xs text-slate-500">GPS is optional</p>
+              <p className="mt-1 text-xs text-slate-500">GPS location required</p>
             </div>
           </div>
           {locationState.error ? (

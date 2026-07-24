@@ -95,8 +95,16 @@ export default function AttendancePage() {
 
     setLoadingAction(true);
     setActionStage("Checking location...");
+    let location;
     try {
-      const location = await refreshLocation(false);
+      location = await refreshLocation(false);
+    } catch (error) {
+      toast.error(error.message || "Location permission is required to mark attendance.");
+      setLoadingAction(false);
+      setActionStage("");
+      return;
+    }
+    try {
       await submitAttendance({
         attendancePhoto,
         attendanceSite,
@@ -109,7 +117,7 @@ export default function AttendancePage() {
         setAttendancePhoto(null);
         setAttendanceSite("");
       }
-      toast.success(location.locationStatus === "Captured" ? message : location.locationStatus === "Permission denied" ? "Attendance marked, but location permission was not allowed." : locationUnavailableMessage);
+      toast.success(message);
       try {
         await load();
       } catch {
@@ -229,7 +237,7 @@ export default function AttendancePage() {
             <div className="surface-muted p-4">
               <p className="text-xs font-black uppercase text-slate-500 dark:text-slate-300">Location Status</p>
               <p className="mt-2 text-sm font-black text-slate-950 dark:text-slate-100">{locationState.status}</p>
-              <p className="mt-1 text-xs text-slate-500 dark:text-slate-300">Attendance is allowed from any location.</p>
+              <p className="mt-1 text-xs text-slate-500 dark:text-slate-300">GPS location is required for check-in and check-out.</p>
             </div>
             <div className="surface-muted p-4">
               <p className="text-xs font-black uppercase text-slate-500 dark:text-slate-300">Coordinates</p>
@@ -252,7 +260,7 @@ export default function AttendancePage() {
               )}
               <p className="mt-1 flex items-center gap-1 text-xs text-slate-500 dark:text-slate-300">
                 <MapPin className="h-3.5 w-3.5" aria-hidden="true" />
-                GPS optional
+                GPS location required
               </p>
             </div>
           </div>
