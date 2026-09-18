@@ -21,6 +21,7 @@ import { attendanceShift } from "../utils/shifts";
 
 const locationUnavailableMessage = "Attendance marked, but location could not be captured.";
 const weekOffEditableStatuses = ["Absent", "Leave", "Missed"];
+const managerPageSize = 100;
 
 export default function AttendancePage() {
   const { user } = useAuth();
@@ -28,6 +29,8 @@ export default function AttendancePage() {
   const canMarkAttendance = roleMatches(user?.role, ["employee", "hr", "admin", "dri"]);
   const [records, setRecords] = useState(null);
   const [today, setToday] = useState(null);
+  const [managerPagination, setManagerPagination] = useState({ page: 1, hasMore: false });
+  const [loadingMore, setLoadingMore] = useState(false);
   const [filters, setFilters] = useState({ date: "", department: "", employeeId: "" });
   const [locationState, setLocationState] = useState({
     coordinates: null,
@@ -40,27 +43,46 @@ export default function AttendancePage() {
   const [loadingAction, setLoadingAction] = useState(false);
   const [actionStage, setActionStage] = useState("");
 
-  const load = async () => {
+  const load = async ({ append = false } = {}) => {
+    if (append && loadingMore) return;
+    if (append) setLoadingMore(true);
     if (isManager) {
-      const params = Object.fromEntries(Object.entries(filters).filter(([, value]) => value));
+      const page = append ? managerPagination.page + 1 : 1;
+      const params = {
+        ...Object.fromEntries(Object.entries(filters).filter(([, value]) => value)),
+        limit: managerPageSize,
+        page
+      };
       const requests = [api.get("/attendance/all", { params })];
       if (canMarkAttendance) requests.push(api.get("/attendance/today"));
-      const [{ data }, todayResponse] = await Promise.all(requests);
-      setRecords(data.attendance);
-      if (todayResponse) setToday(todayResponse.data.attendance);
+      try {
+        const [{ data }, todayResponse] = await Promise.all(requests);
+        setRecords((current) => append ? [...(current || []), ...data.attendance] : data.attendance);
+        setManagerPagination({
+          page: data.pagination?.page || page,
+          hasMore: Boolean(data.pagination?.hasMore)
+        });
+        if (todayResponse) setToday(todayResponse.data.attendance);
+      } finally {
+        if (append) setLoadingMore(false);
+      }
     } else {
-      const [{ data: todayData }, { data: historyData }] = await Promise.all([
-        api.get("/attendance/today"),
-        api.get("/attendance/my-history")
-      ]);
-      setToday(todayData.attendance);
-      const history = historyData.attendance || [];
-      const todayRecord = todayData.attendance;
-      setRecords(
-        todayRecord?.isVirtualWeekOff && !history.some((record) => record.date === todayRecord.date)
-          ? [todayRecord, ...history]
-          : history
-      );
+      try {
+        const [{ data: todayData }, { data: historyData }] = await Promise.all([
+          api.get("/attendance/today"),
+          api.get("/attendance/my-history")
+        ]);
+        setToday(todayData.attendance);
+        const history = historyData.attendance || [];
+        const todayRecord = todayData.attendance;
+        setRecords(
+          todayRecord?.isVirtualWeekOff && !history.some((record) => record.date === todayRecord.date)
+            ? [todayRecord, ...history]
+            : history
+        );
+      } finally {
+        if (append) setLoadingMore(false);
+      }
     }
   };
 
@@ -168,7 +190,7 @@ export default function AttendancePage() {
         title="Attendance"
         description={isManager ? "View check-in, check-out, late, and half-day records." : "Mark attendance and view your history."}
         action={
-          <Button icon={RefreshCcw} onClick={load} variant="secondary">
+          <Button icon={RefreshCcw} onClick={() => load()} variant="secondary">
             Refresh
           </Button>
         }
@@ -314,7 +336,7 @@ export default function AttendancePage() {
               />
             </label>
             <div className="flex items-end">
-              <Button className="w-full" icon={Filter} onClick={load}>
+              <Button className="w-full" icon={Filter} onClick={() => load()}>
                 Apply
               </Button>
             </div>
@@ -506,6 +528,18 @@ export default function AttendancePage() {
           ))}
         </div>
         {!records.length ? <EmptyState title="No attendance records" /> : null}
+        {isManager && managerPagination.hasMore ? (
+          <div className="mt-5 flex justify-center">
+            <Button
+              disabled={loadingMore}
+              icon={RefreshCcw}
+              onClick={() => load({ append: true }).catch((error) => toast.error(error.message))}
+              variant="secondary"
+            >
+              {loadingMore ? "Loading more..." : "Load more attendance"}
+            </Button>
+          </div>
+        ) : null}
       </section>
     </>
   );

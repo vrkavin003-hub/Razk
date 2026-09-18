@@ -1093,7 +1093,22 @@ const mountLocalDevApi = (app) => {
   });
 
   app.get("/api/attendance/all", protect, authorize("admin", "hr"), (req, res) => {
-    return json(res, { attendance: filteredAttendance(req.query).map(populateAttendance) });
+    const attendance = filteredAttendance(req.query).map(populateAttendance);
+    const hasPagination = req.query.limit !== undefined || req.query.page !== undefined;
+    if (!hasPagination) return json(res, { attendance });
+
+    const requestedLimit = Number.parseInt(req.query.limit, 10);
+    const requestedPage = Number.parseInt(req.query.page, 10);
+    const limit = Number.isFinite(requestedLimit)
+      ? Math.min(Math.max(requestedLimit, 1), 200)
+      : 100;
+    const page = Number.isFinite(requestedPage) ? Math.max(requestedPage, 1) : 1;
+    const start = (page - 1) * limit;
+    const pageAttendance = attendance.slice(start, start + limit);
+    return json(res, {
+      attendance: pageAttendance,
+      pagination: { page, limit, hasMore: start + limit < attendance.length }
+    });
   });
 
   app.get("/api/attendance/report", protect, authorize("admin", "hr"), (req, res) => {

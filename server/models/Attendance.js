@@ -75,5 +75,8 @@ const attendanceSchema = new mongoose.Schema(
 
 attendanceSchema.index({ employee: 1, date: 1 }, { unique: true });
 attendanceSchema.index({ date: 1 });
+// Supports the default HR/Admin attendance list ordering without an in-memory
+// sort when the page requests its first or subsequent result window.
+attendanceSchema.index({ date: -1, createdAt: -1 });
 
 module.exports = mongoose.model("Attendance", attendanceSchema);

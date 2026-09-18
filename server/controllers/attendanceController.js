@@ -238,11 +238,36 @@ const getMyHistory = asyncHandler(async (req, res) => {
 
 const getAllAttendance = asyncHandler(async (req, res) => {
   const query = await buildAttendanceQuery(req.query);
-  const attendance = await Attendance.find(query)
+  const attendanceQuery = Attendance.find(query)
     .populate("employee", employeeSelect)
     .sort({ date: -1, createdAt: -1 });
 
-  res.json({ attendance });
+  // Keep the legacy unpaged response available for existing consumers. The
+  // attendance screen requests an explicit page so it does not hydrate and
+  // render the entire history on its first paint.
+  const hasPagination = req.query.limit !== undefined || req.query.page !== undefined;
+  if (!hasPagination) {
+    const attendance = await attendanceQuery.lean();
+    res.json({ attendance });
+    return;
+  }
+
+  const requestedLimit = Number.parseInt(req.query.limit, 10);
+  const requestedPage = Number.parseInt(req.query.page, 10);
+  const limit = Number.isFinite(requestedLimit)
+    ? Math.min(Math.max(requestedLimit, 1), 200)
+    : 100;
+  const page = Number.isFinite(requestedPage) ? Math.max(requestedPage, 1) : 1;
+  const attendance = await attendanceQuery
+    .skip((page - 1) * limit)
+    .limit(limit + 1)
+    .lean();
+  const hasMore = attendance.length > limit;
+
+  res.json({
+    attendance: hasMore ? attendance.slice(0, limit) : attendance,
+    pagination: { page, limit, hasMore }
+  });
 });
 
 const getReport = asyncHandler(async (req, res) => {
